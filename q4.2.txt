@@ -1,0 +1,3 @@
+For 10 samples, expected value and variance: 0.5175211497062785 0.22445729082239635
+For 1000 samples, expected value and variance: 0.7801754107151546 0.7679549069879695
+For 10k samples, expected value and variance: 0.7900644740717525 0.764102137090607
