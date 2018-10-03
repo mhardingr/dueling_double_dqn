@@ -89,7 +89,7 @@ def Q4_4(sample_sizes,custom_distribution,custom_distribution_1,seed):
         normalized_weights = np.multiply(weights, np.mean(weights))
         EF=np.dot(s,normalized_weights)/len(s)
         v=np.var(np.multiply(s,normalized_weights))
-        print("sample mean and variance of size", n ,"by importance sampling with q(x)=N(3,1)=",EF,v)
+        print("sample mean and variance of size", n ,"by weighted importance sampling with q(x)=N(3,1)=",EF,v)
     print("#######################")      
     print("q(x)=N(0,1)")
     for n in sample_sizes:
@@ -101,7 +101,7 @@ def Q4_4(sample_sizes,custom_distribution,custom_distribution_1,seed):
         normalized_weights = np.multiply(weights, np.mean(weights))
         EF=np.dot(s,normalized_weights)/len(s)
         v=np.var(np.multiply(s,normalized_weights))
-        print("sample mean and variance of size", n ,"by importance sampling with q(x)=N(0,1)=",EF,v)
+        print("sample mean and variance of size", n ,"by weighted importance sampling with q(x)=N(0,1)=",EF,v)
     print("#######################")
     print("q(x)=15/16*(x**2)*(1+x)**2")
     for n in sample_sizes:
@@ -114,7 +114,7 @@ def Q4_4(sample_sizes,custom_distribution,custom_distribution_1,seed):
         normalized_weights = np.multiply(weights, np.mean(weights))
         EF=np.dot(s,normalized_weights)/len(s)
         v=np.var(np.multiply(s,normalized_weights))
-        print("sample mean and variance of size", n ,"by importance sampling with q(x)=q(x)=15/16*(x**2)*(1+x)**2=",EF,v)    
+        print("sample mean and variance of size", n ,"by weighted importance sampling with q(x)=q(x)=15/16*(x**2)*(1+x)**2=",EF,v)    
 
 seed=10703
 Q4_2([10, 1000, 10000], custom_distribution,seed)
