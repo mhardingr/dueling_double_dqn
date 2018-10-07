@@ -106,7 +106,6 @@ class DQN_Agent():
 
     def epsilon_greedy_policy(self, q_values):
         # Creating epsilon greedy probabilities to sample from.
-        self.epsilon = max(self.final_epsilon, self.epsilon - self.initial_epsilon/self.exploration_decay_steps)
         if random.random() < self.epsilon:
             action = self.env.action_space.sample()
         else:
@@ -131,6 +130,7 @@ class DQN_Agent():
             returns = 0
             done =False
             while not done:
+                self.epsilon = max(self.final_epsilon, self.epsilon - self.initial_epsilon/self.exploration_decay_steps)
                 q_values = self.model.model.predict(state)[0]
                 action =  self.epsilon_greedy_policy(q_values)
                 next_state, reward, done, info = self.env.step(action)
@@ -139,8 +139,22 @@ class DQN_Agent():
                 state = next_state
                 returns += discount * reward 
                 discount=discount*self.gamma
-            episodes_20_return.append(returns)
             if counter % 20 == 0:
+                for epsd in range(20):
+                    state = self.env.reset()
+                    state = np.expand_dims(state,0)
+                    discount=1
+                    returns = 0
+                    done =False
+                    while not done:
+                        q_values = self.model.model.predict(state)[0]
+                        action =  self.epsilon_greedy_policy(q_values)
+                        next_state, reward, done, info = self.env.step(action)
+                        next_state = np.expand_dims(next_state,0)
+                        state = next_state
+                        returns += discount * reward 
+                        discount=discount*self.gamma
+                    episodes_20_return.append(returns)
                 self.avg_training_episodes_return.append(sum(episodes_20_return)/20)
                 episodes_20_return = []
             batch = self.memory.sample_batch(self.batch_size)
@@ -180,7 +194,7 @@ class DQN_Agent():
             returns = 0
             done =False
             while not done:
-                self.env.render()
+#                self.env.render()
                 q_values = self.model.model.predict(state)[0]
                 action =  self.greedy_policy(q_values)
                 next_state, reward, done, info = self.env.step(action)
