@@ -7,20 +7,35 @@ class QNetwork():
 	# The network should take in state of the world as an input, 
 	# and output Q values of the actions available to the agent as the output. 
 
-	def __init__(self, environment_name):
+    # Define mapping from environment name to 
+    # list containing [state shape, n_actions]
+    ENV_INFO = {"CartPole-v0": [(4,), 2], 
+                "MountainCar-v0": [(2,), 3]}
+
+    def __init__(self, environment_name):
 		# Define your network architecture here. It is also a good idea to define any training operations 
 		# and optimizers here, initialize your variables, or alternately compile your model here.  
-		pass
-
-	def save_model_weights(self, suffix):
+        env_info = self.ENV_INFO[environment_name]
+        self.model = keras.models.Sequential([
+            keras.layers.Dense(8, input_size=env_info[0]),
+            keras.layers.ReLU(),
+            keras.layers.Dense(16),
+            keras.layers.ReLU(),
+            keras.layers.Dense(64),
+            keras.layers.ReLU(),
+            keras.layers.Dense(env_info[1])
+            ])
+        self.model.compile(optimizer='rmsprop',
+                            loss='mse', metrics=
+    def save_model_weights(self, suffix):
 		# Helper function to save your model / weights. 
 		pass
 
-	def load_model(self, model_file):
+    def load_model(self, model_file):
 		# Helper function to load an existing model.
 		pass
 
-	def load_model_weights(self,weight_file):
+    def load_model_weights(self,weight_file):
 		# Helper funciton to load model weights. 
 		pass
 
@@ -83,6 +98,7 @@ class DQN_Agent():
 	def test(self, model_file=None):
 		# Evaluate the performance of your agent over 100 episodes, by calculating cummulative rewards for the 100 episodes.
 		# Here you need to interact with the environment, irrespective of whether you are using a memory. 
+            pass 
 
 	def burn_in_memory():
 		# Initialize your replay memory with a burn_in number of episodes / transitions. 
