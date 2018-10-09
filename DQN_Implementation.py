@@ -8,10 +8,60 @@ Created on Sun Oct  7 09:54:24 2018
 
 import keras, tensorflow as tf, numpy as np, gym, sys, copy, argparse, collections, random
 import matplotlib.pyplot as plt
+import math
+from gym import spaces, logger
 
 learning_rate_CP = 0.001
 learning_rate_MC = 0.0001
 
+steps_beyond_done = None
+
+def next_state_func(state, action):
+        # copied from gym's cartpole.py
+        gravity = 9.8
+        masscart = 1.0
+        masspole = 0.1
+        total_mass = (masspole + masscart)
+        length = 0.5 # actually half the pole's length
+        polemass_length = (masspole * length)
+        force_mag = 10.0
+        tau = 0.02  # seconds between state updates
+        # Angle at which to fail the episode
+        theta_threshold_radians = 12 * 2 * math.pi / 360
+        x_threshold = 2.4
+        global steps_beyond_done
+        
+        x, x_dot, theta, theta_dot = state
+        force = force_mag if action==1 else -force_mag
+        costheta = math.cos(theta)
+        sintheta = math.sin(theta)
+        temp = (force + polemass_length * theta_dot * theta_dot * sintheta) / total_mass
+        thetaacc = (gravity * sintheta - costheta* temp) / (length * (4.0/3.0 - masspole * costheta * costheta / total_mass))
+        xacc  = temp - polemass_length * thetaacc * costheta / total_mass
+        x  = x + tau * x_dot
+        x_dot = x_dot + tau * xacc
+        theta = theta + tau * theta_dot
+        theta_dot = theta_dot + tau * thetaacc
+        state = (x,x_dot,theta,theta_dot)
+        done =  x < -x_threshold \
+                or x > x_threshold \
+                or theta < -theta_threshold_radians \
+                or theta > theta_threshold_radians
+        done = bool(done)
+
+        if not done:
+            reward = 1.0
+        elif steps_beyond_done is None:
+            # Pole just fell!
+            steps_beyond_done = None
+            reward = 1.0
+        else:
+            if steps_beyond_done == 0:
+                logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
+            steps_beyond_done += 1
+            reward = 0.0
+        return np.array(state), reward, done, {}
+        # copied from gym's cartpole.py
 
 
 class QNetwork():
@@ -102,15 +152,88 @@ class DQN_Agent():
         self.num_episodes = 1000
         self.batch_size = 32
         self.avg_training_episodes_return=[]
-
+        self.avg_performance_episodes_return = []
+        self.avg_performance_episodes_return_2SLA = []
+        self.decay = 0.999
 
     def epsilon_greedy_policy(self, q_values):
         # Creating epsilon greedy probabilities to sample from.
+        self.epsilon = max(self.final_epsilon, self.epsilon - self.initial_epsilon/self.exploration_decay_steps)
         if random.random() < self.epsilon:
             action = self.env.action_space.sample()
         else:
             action = np.argmax(q_values)
         return action
+    
+    def epsilon_greedy_policy_005(self, q_values):
+        # Creating epsilon greedy probabilities to sample from.
+        if random.random() < 0.05:
+            action = self.env.action_space.sample()
+        else:
+            action = np.argmax(q_values)
+        return action
+    def two_step_lookahead(self,state):
+        global steps_beyond_done
+        sbd = steps_beyond_done
+        next_state_0, reward_0, done_0, _ = next_state_func(state, 0)
+        sbd1 = steps_beyond_done        
+        
+        if not done_0:
+            next_state_0_0, reward_0_0, done_0_0, _ = next_state_func(next_state_0, 0)
+            if not done_0_0:
+                next_state_0_0 = np.expand_dims(next_state_0_0,0)
+                return_action_0_0 = reward_0 + reward_0_0 + max(self.model.model.predict(next_state_0_0)[0])
+            else:
+                return_action_0_0 = reward_0 + reward_0_0
+                
+            steps_beyond_done = sbd1   
+            next_state_0_1, reward_0_1, done_0_1,_ = next_state_func(next_state_0, 1)
+            if not done_0_1:
+                next_state_0_1 = np.expand_dims(next_state_0_1,0)
+                return_action_0_1 = reward_0 + reward_0_1 + max(self.model.model.predict(next_state_0_1)[0])
+            else:
+                return_action_0_1 = reward_0 + reward_0_1    
+        else:
+            return_action_0_0 = reward_0
+            return_action_0_1 = reward_0
+        max_return_action_0 =max(return_action_0_0,return_action_0_1)
+        
+        steps_beyond_done = sbd
+        next_state_1, reward_1, done_1, _ = next_state_func(state, 1)
+        sbd2 = steps_beyond_done 
+        if not done_1:
+            next_state_1_0, reward_1_0, done_1_0, _ = next_state_func(next_state_1, 0)
+            if not done_1_0:
+                next_state_1_0 = np.expand_dims(next_state_1_0,0)
+                return_action_1_0 = reward_1 + reward_1_0 + max(self.model.model.predict(next_state_1_0)[0])
+            else:
+                return_action_1_0 = reward_1 + reward_1_0
+           
+            steps_beyond_done = sbd2                   
+            next_state_1_1, reward_1_1, done_1_1,_ = next_state_func(next_state_1, 1)
+            if not done_1_1:
+                next_state_1_1 = np.expand_dims(next_state_1_1,0)
+                return_action_1_1 = reward_1 + reward_1_1 + max(self.model.model.predict(next_state_1_1)[0])
+            else:
+                return_action_1_1 = reward_1 + reward_1_1    
+        else:
+            return_action_1_0 = reward_1
+            return_action_1_1 = reward_1
+        max_return_action_1 =max(return_action_1_0,return_action_1_1)
+        
+#        next_state_1, reward_1, done_1, _ = next_state_func(state, 1)
+#        next_state_1_0, reward_1_0, done_1_0, _ = next_state_func(next_state_1, 0)
+#        next_state_1_1, reward_1_1, done_1_1, _ = next_state_func(next_state_1, 1)
+#        next_state_1_0 = np.expand_dims(next_state_1_0,0)
+#        next_state_1_1 = np.expand_dims(next_state_1_1,0)
+#        return_action_1_0 = reward_1 + reward_1_0 + max(self.model.model.predict(next_state_1_0)[0])
+#        return_action_1_1 = reward_1 + reward_1_1 + max(self.model.model.predict(next_state_1_1)[0])
+#        max_return_action_1 =max(return_action_1_0,return_action_1_1)
+
+        action = 0 if max_return_action_0 >= max_return_action_1 else 1
+        
+        return action
+
 
     def greedy_policy(self, q_values):
         # Creating greedy policy for test time.
@@ -121,42 +244,32 @@ class DQN_Agent():
         # If training without experience replay_memory, then you will interact with the environment
         # in this function, while also updating your network parameters.
         counter = 1
-        episodes_20_return = []
+        episodes_return = []
+        num_of_episodes_to_update_train_and_perf_curve = 200
+        num_episodes_for_performance_curve = 20
         self.avg_training_episodes_return = []
+        self.avg_performance_episodes_return = []
         for episode in range(self.num_episodes):
             state = self.env.reset()
             state = np.expand_dims(state,0)
-            discount=1
             returns = 0
             done =False
             while not done:
-                self.epsilon = max(self.final_epsilon, self.epsilon - self.initial_epsilon/self.exploration_decay_steps)
                 q_values = self.model.model.predict(state)[0]
                 action =  self.epsilon_greedy_policy(q_values)
                 next_state, reward, done, info = self.env.step(action)
                 next_state = np.expand_dims(next_state,0)
                 self.memory.append((state, action, reward, next_state, done))
                 state = next_state
-                returns += discount * reward 
-                discount=discount*self.gamma
-            if counter % 20 == 0:
-                for epsd in range(20):
-                    state = self.env.reset()
-                    state = np.expand_dims(state,0)
-                    discount=1
-                    returns = 0
-                    done =False
-                    while not done:
-                        q_values = self.model.model.predict(state)[0]
-                        action =  self.epsilon_greedy_policy(q_values)
-                        next_state, reward, done, info = self.env.step(action)
-                        next_state = np.expand_dims(next_state,0)
-                        state = next_state
-                        returns += discount * reward 
-                        discount=discount*self.gamma
-                    episodes_20_return.append(returns)
-                self.avg_training_episodes_return.append(sum(episodes_20_return)/20)
-                episodes_20_return = []
+                returns +=  reward 
+            episodes_return.append(returns)
+            ## get the points of the training curve
+            if counter % num_of_episodes_to_update_train_and_perf_curve == 0:
+                self.avg_training_episodes_return.append(sum(episodes_return)/num_of_episodes_to_update_train_and_perf_curve)
+                episodes_return = []
+            ## get the points for the performance curve
+#                self.avg_performance_episodes_return.append(self.performance_plot_data(num_episodes_for_performance_curve))
+            ## due a batch update
             batch = self.memory.sample_batch(self.batch_size)
             batch_states = []
             batch_q_values =[]
@@ -179,10 +292,16 @@ class DQN_Agent():
             counter += 1
         plt.figure()
         plt.plot(self.avg_training_episodes_return,label='training_curve')
-        plt.xlabel('Training Epochs (1 epoch corresponds to 20 episodes/weight updates)')
+        plt.xlabel('Training Epochs (1 epoch corresponds to '+str(num_of_episodes_to_update_train_and_perf_curve) + ' episodes)')
         plt.ylabel('Average Reward per Episode')
         plt.legend(loc='best')
         plt.show()
+#        plt.figure()
+#        plt.plot(self.avg_performance_episodes_return,label='performance_curve')
+#        plt.xlabel('Training Epochs (1 epoch corresponds to '+str(num_of_episodes_to_update_train_and_perf_curve) + ' episodes)')
+#        plt.ylabel('Average Reward per Episode')
+#        plt.legend(loc='best')
+#        plt.show()
         # If you are using a replay memory, you should interact with environment here, and store these
         # transitions to memory, while also updating your model.
     def test(self, model_file=None):
@@ -190,7 +309,7 @@ class DQN_Agent():
         # Here you need to interact with the environment, irrespective of whether you are using a memory.
         for episode in range(100):
             state = self.env.reset()
-            state = np.expand_dims(state,0)#np.reshape(state, [1,self.env.observation_space.shape[0]])
+            state = np.expand_dims(state,0)
             returns = 0
             done =False
             while not done:
@@ -198,26 +317,85 @@ class DQN_Agent():
                 q_values = self.model.model.predict(state)[0]
                 action =  self.greedy_policy(q_values)
                 next_state, reward, done, info = self.env.step(action)
-                next_state = np.expand_dims(next_state,0)#np.reshape(next_state, [1,self.env.observation_space.shape[0]])
+                next_state = np.expand_dims(next_state,0)
                 state = next_state
                 returns += reward  
         print("total_returns=",returns)
+        
+    def performance_plot_data(self,num_episodes, model_file=None):
+        episodes_return = []
+        for episode in range(num_episodes):
+            state = self.env.reset()
+            state = np.expand_dims(state,0)
+            returns = 0
+            done =False
+            while not done:
+                q_values = self.model.model.predict(state)[0]
+                action =  self.epsilon_greedy_policy_005(q_values)
+                next_state, reward, done, info = self.env.step(action)
+                next_state = np.expand_dims(next_state,0)
+                state = next_state
+                # no discounting
+                returns += reward 
+            episodes_return.append(returns)
+        return (sum(episodes_return)/num_episodes)
+    def performance_plot_data_2_steps_LA(self,num_episodes, model_file=None):
+        episodes_return = []
+        for episode in range(num_episodes):
+            state = self.env.reset()
+            global steps_beyond_done
+            steps_beyond_done = None
+            returns = 0
+            done =False
+            while not done:
+                action =  self.two_step_lookahead(state)
+                next_state, reward, done, info = self.env.step(action)
+                state = next_state
+                # no discounting
+                returns += reward 
+            episodes_return.append(returns)
+        return (sum(episodes_return)/num_episodes)
+    
+    def performance_curves_from_weight_files(self):
+        self.avg_performance_episodes_return = []
+        self.avg_performance_episodes_return_2SLA = []
+        start = 200
+        stop = self.num_episodes +1
+        step = 200
+        num_episodes_for_performance_curve = 20
+        for indx in range(start, stop,step):
+            filename = 'weights_'+str(self.env_name)+'_'+str(indx)
+            self.model.load_model_weights(filename)
+            self.avg_performance_episodes_return.append(self.performance_plot_data(num_episodes_for_performance_curve))
+            self.avg_performance_episodes_return_2SLA.append(self.performance_plot_data_2_steps_LA(num_episodes_for_performance_curve))
+            
+
+    def plots(self):
+        num_of_episodes_to_update_train_and_perf_curve = 200
+        plt.figure()
+        plt.plot(self.avg_performance_episodes_return,label='performance_curve')
+        plt.plot(self.avg_performance_episodes_return_2SLA,label='performance_curve 2 steps look_ahead')
+        plt.xlabel('Training Epochs (1 epoch corresponds to '+str(num_of_episodes_to_update_train_and_perf_curve) + ' episodes)')
+        plt.ylabel('Average Reward per Episode')
+        plt.legend(loc='best')
+        plt.show()
+    
+    
     def burn_in_memory(self):
         # Initialize your replay memory with a burn_in number of episodes / transitions.
         state = self.env.reset()
-        state = np.expand_dims(state,0)#np.reshape(state, [1,self.env.observation_space.shape[0]])
-#        state = np.expand_dims(state,0)
+        state = np.expand_dims(state,0)
         for i in range(32):
             action = self.env.action_space.sample()
             next_state, reward, done, info = self.env.step(action)
             #reward
-            next_state = np.expand_dims(next_state,0)#np.reshape(next_state, [1,self.env.observation_space.shape[0]])
+            next_state = np.expand_dims(next_state,0)
             self.memory.append((state, action, reward, next_state, done))
             if not done:
                 state = next_state
             else:
                 state = self.env.reset()
-                state = np.expand_dims(state,0)#np.reshape(state, [1,self.env.observation_space.shape[0]])
+                state = np.expand_dims(state,0)
                 
 
 def parse_arguments():
@@ -249,4 +427,6 @@ if __name__ == '__main__':
     agent.burn_in_memory()
     agent.train()
     agent.test()
+    agent.performance_curves_from_weight_files()
+    agent.plots()
 
