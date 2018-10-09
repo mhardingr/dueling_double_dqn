@@ -56,8 +56,8 @@ def next_state_func(state, action):
             steps_beyond_done = 0
             reward = 1.0
         else:
-            if steps_beyond_done == 0:
-                logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
+#            if steps_beyond_done == 0:
+#                logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
             steps_beyond_done += 1
             reward = 0.0
         return np.array(state), reward, done, {}
@@ -149,7 +149,7 @@ class DQN_Agent():
         self.epsilon = self.initial_epsilon
         self.final_epsilon = 0.05
         self.exploration_decay_steps = 10**5
-        self.num_episodes = 1000
+        self.num_episodes = 10000
         self.batch_size = 32
         self.avg_training_episodes_return=[]
         self.avg_performance_episodes_return = []
@@ -263,6 +263,7 @@ class DQN_Agent():
                 state = next_state
                 returns +=  reward 
             episodes_return.append(returns)
+            print("Episode: ",counter," Reward: ", returns)
             ## get the points of the training curve
             if counter % num_of_episodes_to_update_train_and_perf_curve == 0:
                 self.avg_training_episodes_return.append(sum(episodes_return)/num_of_episodes_to_update_train_and_perf_curve)
@@ -288,7 +289,6 @@ class DQN_Agent():
                 filename = 'weights_'+str(self.env_name)+'_'+str(counter)
                 print(filename)
                 self.model.save_model_weights(filename)
-            print(counter)
             counter += 1
         plt.figure()
         plt.plot(self.avg_training_episodes_return,label='training_curve')
@@ -307,6 +307,7 @@ class DQN_Agent():
     def test(self, model_file=None):
         # Evaluate the performance of your agent over 100 episodes, by calculating cummulative rewards for the 100 episodes.
         # Here you need to interact with the environment, irrespective of whether you are using a memory.
+        total_return= 0
         for episode in range(100):
             state = self.env.reset()
             state = np.expand_dims(state,0)
@@ -319,8 +320,9 @@ class DQN_Agent():
                 next_state, reward, done, info = self.env.step(action)
                 next_state = np.expand_dims(next_state,0)
                 state = next_state
-                returns += reward  
-        print("total_returns=",returns)
+                returns += reward 
+            total_return += returns
+        print("total_returns=",total_return)
         
     def performance_plot_data(self,num_episodes, model_file=None):
         episodes_return = []
