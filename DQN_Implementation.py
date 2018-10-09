@@ -53,7 +53,7 @@ def next_state_func(state, action):
             reward = 1.0
         elif steps_beyond_done is None:
             # Pole just fell!
-            steps_beyond_done = None
+            steps_beyond_done = 0
             reward = 1.0
         else:
             if steps_beyond_done == 0:
