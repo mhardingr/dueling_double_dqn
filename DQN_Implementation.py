@@ -11,11 +11,30 @@ import matplotlib.pyplot as plt
 import math
 from gym import spaces, logger
 
+#hyperparameters
 learning_rate_CP = 0.001
 learning_rate_MC = 0.0001
+hidden_layer1 = 8
+hidden_layer2 = 16
+hidden_layer3 = 32
+gamma_CP =  0.99
+gamma_MC =  1
+burn_in_MC = 50 #number of episodes to burn_in for Mountain car (according to a piazza post)
+burn_in_CP = 1000 #number of episodes to burn_in for Cartpole (according to a piazza post)
+Memory_Size = 50000
+initial_epsilon = 0.5
+final_epsilon = 0.05
+exploration_decay_steps = 10**5
+num_episodes = 10000
+minibatch_size = 32
+save_weights_num_episodes = 100
+update_target_network_weights = 1
+DQN =False
+DDQN = True
+#decay = 0.999
+
 
 steps_beyond_done = None
-
 def next_state_func(state, action):
         # copied from gym's cartpole.py
         gravity = 9.8
@@ -81,9 +100,9 @@ class QNetwork():
         else:
             assert "Environment not available"
         self.model = keras.models.Sequential()
-        self.model.add(keras.layers.Dense(8, input_dim=state_dim, activation='relu'))
-        self.model.add(keras.layers.Dense(16, activation='relu'))
-        self.model.add(keras.layers.Dense(64, activation='relu'))
+        self.model.add(keras.layers.Dense(hidden_layer1, input_dim=state_dim, activation='relu'))
+        self.model.add(keras.layers.Dense(hidden_layer2, activation='relu'))
+        self.model.add(keras.layers.Dense(hidden_layer3, activation='relu'))
         self.model.add(keras.layers.Dense(Q_dim, activation='linear'))
         self.model.compile(loss='mse', optimizer=keras.optimizers.Adam(lr=learning_rate))
 
@@ -101,7 +120,7 @@ class QNetwork():
 
 class Replay_Memory():
 
-    def __init__(self, memory_size=50000, burn_in=10000):
+    def __init__(self,burn_in, memory_size=Memory_Size):
 
         # The memory essentially stores transitions recorder from the agent
         # taking actions in the environment.
@@ -143,18 +162,18 @@ class DQN_Agent():
         self.env = gym.make(environment_name)
         self.model = QNetwork(environment_name)
         self.model_target = QNetwork(environment_name)
-        self.memory = Replay_Memory()
-        self.gamma = 1 if environment_name == 'MountainCar-v0' else 0.99
-        self.initial_epsilon = 0.5
+        self.burn_in = burn_in_MC if environment_name == 'MountainCar-v0' else burn_in_CP
+        self.memory = Replay_Memory(self.burn_in)
+        self.gamma = gamma_MC if environment_name == 'MountainCar-v0' else gamma_CP
+        self.initial_epsilon = initial_epsilon
         self.epsilon = self.initial_epsilon
-        self.final_epsilon = 0.05
-        self.exploration_decay_steps = 10**5
-        self.num_episodes = 10000
-        self.batch_size = 32
+        self.final_epsilon = final_epsilon
+        self.exploration_decay_steps = exploration_decay_steps
+        self.num_episodes = num_episodes
+        self.minibatch_size = minibatch_size
         self.avg_training_episodes_return=[]
         self.avg_performance_episodes_return = []
         self.avg_performance_episodes_return_2SLA = []
-        self.decay = 0.999
 
     def epsilon_greedy_policy(self, q_values):
         # Creating epsilon greedy probabilities to sample from.
@@ -172,6 +191,7 @@ class DQN_Agent():
         else:
             action = np.argmax(q_values)
         return action
+    
     def two_step_lookahead(self,state):
         global steps_beyond_done
         sbd = steps_beyond_done
@@ -220,18 +240,7 @@ class DQN_Agent():
             return_action_1_0 = reward_1
             return_action_1_1 = reward_1
         max_return_action_1 =max(return_action_1_0,return_action_1_1)
-        
-#        next_state_1, reward_1, done_1, _ = next_state_func(state, 1)
-#        next_state_1_0, reward_1_0, done_1_0, _ = next_state_func(next_state_1, 0)
-#        next_state_1_1, reward_1_1, done_1_1, _ = next_state_func(next_state_1, 1)
-#        next_state_1_0 = np.expand_dims(next_state_1_0,0)
-#        next_state_1_1 = np.expand_dims(next_state_1_1,0)
-#        return_action_1_0 = reward_1 + reward_1_0 + max(self.model.model.predict(next_state_1_0)[0])
-#        return_action_1_1 = reward_1 + reward_1_1 + max(self.model.model.predict(next_state_1_1)[0])
-#        max_return_action_1 =max(return_action_1_0,return_action_1_1)
-
         action = 0 if max_return_action_0 >= max_return_action_1 else 1
-        
         return action
 
 
@@ -241,14 +250,15 @@ class DQN_Agent():
         return action
     def train(self):
         # In this function, we will train our network.
-        # If training without experience replay_memory, then you will interact with the environment
-        # in this function, while also updating your network parameters.
+        # If you are using a replay memory, you should interact with environment here, and store these
+        # transitions to memory, while also updating your model.
         counter = 1
         episodes_return = []
         num_of_episodes_to_update_train_and_perf_curve = 200
-        num_episodes_for_performance_curve = 20
+#        num_episodes_for_performance_curve = 20
         self.avg_training_episodes_return = []
         self.avg_performance_episodes_return = []
+        self.model_target.model.set_weights(self.model.model.get_weights())
         for episode in range(self.num_episodes):
             state = self.env.reset()
             state = np.expand_dims(state,0)
@@ -270,25 +280,31 @@ class DQN_Agent():
                 episodes_return = []
             ## get the points for the performance curve
 #                self.avg_performance_episodes_return.append(self.performance_plot_data(num_episodes_for_performance_curve))
-            ## due a batch update
-            batch = self.memory.sample_batch(self.batch_size)
-            batch_states = []
-            batch_q_values =[]
-            for state, action, reward, next_state, done in batch:
+            ## do a minibatch update
+            minibatch = self.memory.sample_batch(self.minibatch_size)
+            minibatch_states = []
+            minibatch_q_values =[]
+            for state, action, reward, next_state, done in minibatch:
                 q_values = self.model.model.predict(state)[0]
-                q_value = reward + self.gamma * np.amax(self.model_target.model.model.predict(next_state)[0])
+                if DQN:
+                    q_value = reward + self.gamma * np.amax(self.model_target.model.model.predict(next_state)[0])
+                elif DDQN:
+                    act = np.argmax(self.model.model.predict(next_state)[0])
+                    q_value = reward + self.gamma * self.model_target.model.model.predict(next_state)[0][act]
                 if done:
                     q_values[action] = reward
                 else:
                     q_values[action] = q_value
-                batch_states.append(state[0])
-                batch_q_values.append(q_values)
-            self.model.model.fit(np.array(batch_states), np.array(batch_q_values),batch_size= self.batch_size, epochs=1, verbose=0)
-            if counter % 100 == 0:
+                minibatch_states.append(state[0])
+                minibatch_q_values.append(q_values)
+            self.model.model.fit(np.array(minibatch_states), np.array(minibatch_q_values),batch_size= self.minibatch_size, epochs=1, verbose=0)
+            if counter % save_weights_num_episodes == 0:
                 self.model_target.model.set_weights(self.model.model.get_weights())
                 filename = 'weights_'+str(self.env_name)+'_'+str(counter)
                 print(filename)
                 self.model.save_model_weights(filename)
+            if counter % update_target_network_weights == 0:
+                self.model_target.model.set_weights(self.model.model.get_weights())
             counter += 1
         plt.figure()
         plt.plot(self.avg_training_episodes_return,label='training_curve')
@@ -296,14 +312,6 @@ class DQN_Agent():
         plt.ylabel('Average Reward per Episode')
         plt.legend(loc='best')
         plt.show()
-#        plt.figure()
-#        plt.plot(self.avg_performance_episodes_return,label='performance_curve')
-#        plt.xlabel('Training Epochs (1 epoch corresponds to '+str(num_of_episodes_to_update_train_and_perf_curve) + ' episodes)')
-#        plt.ylabel('Average Reward per Episode')
-#        plt.legend(loc='best')
-#        plt.show()
-        # If you are using a replay memory, you should interact with environment here, and store these
-        # transitions to memory, while also updating your model.
     def test(self, model_file=None):
         # Evaluate the performance of your agent over 100 episodes, by calculating cummulative rewards for the 100 episodes.
         # Here you need to interact with the environment, irrespective of whether you are using a memory.
@@ -387,7 +395,7 @@ class DQN_Agent():
         # Initialize your replay memory with a burn_in number of episodes / transitions.
         state = self.env.reset()
         state = np.expand_dims(state,0)
-        for i in range(32):
+        for i in range(self.memory.burn_in):
             action = self.env.action_space.sample()
             next_state, reward, done, info = self.env.step(action)
             #reward
