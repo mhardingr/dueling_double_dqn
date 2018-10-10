@@ -29,8 +29,7 @@ num_episodes = 10000
 minibatch_size = 32
 save_weights_num_episodes = 100
 update_target_network_weights = 1
-DQN =False
-DDQN = True
+DDQN = False
 #decay = 0.999
 
 
@@ -286,11 +285,12 @@ class DQN_Agent():
             minibatch_q_values =[]
             for state, action, reward, next_state, done in minibatch:
                 q_values = self.model.model.predict(state)[0]
-                if DQN:
-                    q_value = reward + self.gamma * np.amax(self.model_target.model.model.predict(next_state)[0])
-                elif DDQN:
+                if DDQN:
                     act = np.argmax(self.model.model.predict(next_state)[0])
                     q_value = reward + self.gamma * self.model_target.model.model.predict(next_state)[0][act]
+                else:
+                    q_value = reward + self.gamma * np.amax(self.model_target.model.model.predict(next_state)[0])
+
                 if done:
                     q_values[action] = reward
                 else:
