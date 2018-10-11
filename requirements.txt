@@ -4,5 +4,6 @@ numpy
 scipy
 matplotlib
 six
-tensorflow
 protobuf
+tensorflow==1.5
+keras

@@ -59,7 +59,7 @@ def get_exp_var_weighted_importance_sampling(p_gen, q_gen, f_x, n_samples,
                                         * f_x(z) \
                                         / norm_denom)
     weighted_impt_samples = vfunc(samples)
-    sample_mean = np.mean(weighted_impt_samples)
+    sample_mean = np.sum(weighted_impt_samples)
     sample_variance = np.mean( np.square((weighted_impt_samples - sample_mean)) )
 
     return sample_mean, sample_variance
