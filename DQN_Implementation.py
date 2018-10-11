@@ -10,11 +10,28 @@ import collections, random
 import matplotlib.pyplot as plt
 import math 
 
-learning_rate_CP = 0.001
-learning_rate_MC = 0.0001
+#hyperparameters
+hidden_layer1 = 8
+hidden_layer2 = 16
+hidden_layer3 = 32
+dueling_hidden_layer3 = 128
+gamma_CP =  0.99
+gamma_MC =  1
+burn_in_MC = 20000 # TODO number of episodes to burn_in for Mountain car (according to a piazza post)
+burn_in_CP = 10000 #TODO number of episodes to burn_in for Cartpole (according to a piazza post)
+mem_size = 50000
+initial_epsilon = 0.5
+final_epsilon = 0.05
+exploration_decay_steps = 10**5
+num_episodes = 10000
+minibatch_size = 32
+save_weights_num_episodes = 100
+steps_update_target_network_weights = 100
+k_steps_before_minibatch = 4 
+DDQN = False
+
 
 steps_beyond_done = None
-
 def next_state_func(state, action):
         # copied from gym's cartpole.py
         gravity = 9.8
@@ -79,9 +96,9 @@ class QNetwork():
         # DQN network is instantiated using Keras
         state_dim, Q_dim, lr  = self.ENV_INFO[environment_name]
         dqn_layers = [
-            keras.layers.Dense(8, input_shape=state_dim, activation='relu'),
-            keras.layers.Dense(16, activation='relu'),
-            keras.layers.Dense(64, activation='relu'),
+            keras.layers.Dense(hidden_layer1, input_shape=state_dim, activation='relu'),
+            keras.layers.Dense(hidden_layer2, activation='relu'),
+            keras.layers.Dense(hidden_layer3, activation='relu'),
             keras.layers.Dense(Q_dim, activation='linear')
             ]
         self.model = keras.models.Sequential(dqn_layers)
@@ -128,35 +145,38 @@ class Dueling_QNetwork(QNetwork):
 		# and optimizers here, initialize your variables, or alternately compile your model here.  
         state_dim, Q_dim, lr  = self.ENV_INFO[environment_name]
         
-        inputs = Input(shape=state_dim)
-        h0_out = keras.layers.Dense(8, activation='relu')(inputs)
-        h1_out = keras.layers.Dense(16, activation='relu')(h0_out)
+        inputs = keras.layers.Input(shape=state_dim)
+        h0_out = keras.layers.Dense(hidden_layer1, activation='relu')(inputs)
+        h1_out = keras.layers.Dense(hidden_layer2, activation='relu')(h0_out)
         # We need to diverge the network architecture into 2 fully connected
         ## streams from the output of the h1
         # First, the state-value stream: a fully-connected layer of 128 units
         ## which is then passed through to a scalar output layer
-        h2_out_vs = keras.layers.Dense(128, activation='relu')(h1_out)
+        h2_out_vs = keras.layers.Dense(dueling_hidden_layer3, activation='relu')(h1_out)
         value_out = keras.layers.Dense(1, activation='relu')(h2_out_vs)
-        # Next, the advantage-value stream: similarly a fc layer of 128 units
+        # In parallel, next, the advantage-value stream: similarly a fc layer of 128 units
         ## then passed to another fc layer with output size = Q_dim
-        h2_out_advs = keras.layers.Dense(128, activation='relu')(h1_out)
+        h2_out_advs = keras.layers.Dense(dueling_hidden_layer3, activation='relu')(h1_out)
         adv_out  = keras.layers.Dense(Q_dim, activation='relu')(h2_out_advs)
 
         # Lastly, the output of the Dueling network is defined as a function
         ## of the two streams:
         ## Q_vals = value_out - f(adv_out)  // Using broadcasting from TF
         ## where f(adv_out) = adv_out - sample_avg(adv)
-        sample_avg_adv = keras.layers.AveragePooling1D(pool_size=len(Q_dim), strides=1)(adv_out)
-        f_adv = keras.layers.Subtract()([adv_out, sample_avg_adv])
-        Q_vals = keras.layers.Subtract()([value_out, f_adv])
+        sample_avg_adv = keras.layers.Lambda(\
+                                lambda l_in: keras.backend.mean(l_in))(adv_out)
+        f_adv = keras.layers.Lambda(lambda l_in: l_in[0]-l_in[1])\
+                                    ([adv_out, sample_avg_adv])
+        Q_vals = keras.layers.Lambda(lambda l_in: l_in[0]-l_in[1])\
+                                    ([value_out, f_adv])
         
         self.model = keras.models.Model(inputs=inputs, outputs=Q_vals)
         self.model.compile(loss='mse', optimizer=keras.optimizers.Adam(lr=lr))
 
 class Replay_Memory():
 
-    def __init__(self, memory_size=50000, burn_in=10000):
-		# The memory essentially stores transitions recorder from the agent
+    def __init__(self, burn_in, memory_size=mem_size):
+		# The memory essentially stores transitions recorded from the agent
 		# taking actions in the environment.
 
 		# Burn in episodes define the number of episodes that are written into the memory from the 
@@ -195,23 +215,26 @@ class Deep_Agent():
         self.env = gym.make(environment_name)
 
         # Instantiate the models
-        if model_name == "dqn":
+        if model_name == "dqn" or model_name == 'ddqn':
             self.model = QNetwork(environment_name)
             self.model_target = QNetwork(environment_name)
-        elif model_name == "dueling":
+        else:
+            # model_name == "dueling"
             self.model = Dueling_QNetwork(environment_name)
             self.model_target = Dueling_QNetwork(environment_name)
 
-        self.memory = Replay_Memory()
-        self.gamma = 1.0 if environment_name == 'MountainCar-v0' else 0.99
-        self.initial_epsilon = 0.5
+
+        self.burn_in = burn_in_MC if environment_name == 'MountainCar-v0' else burn_in_CP
+        self.memory = Replay_Memory(self.burn_in)
+        self.gamma = gamma_MC if environment_name == 'MountainCar-v0' else gamma_CP
+        self.initial_epsilon = initial_epsilon
         self.epsilon = self.initial_epsilon
-        self.final_epsilon = 0.05
-        self.exploration_decay_steps = 10**5
-        self.num_episodes = 10000 if not num_episodes else num_episodes
-        self.batch_size = 32
-        self.decay = 0.999
-        self.n_steps_before_update_tgt = 100
+        self.final_epsilon = final_epsilon
+        self.exploration_decay_steps = exploration_decay_steps
+        self.num_episodes = num_episodes
+        self.minibatch_size = minibatch_size
+        self.n_steps_before_update_tgt = steps_update_target_network_weights 
+        self.k_steps_before_minibatch = k_steps_before_minibatch
         self.num_of_episodes_to_update_train_and_perf_curve = 200 if not curve_episodes else curve_episodes
 
         self.avg_training_episodes_return=[]
@@ -288,10 +311,9 @@ class Deep_Agent():
         max_return_action_1 =max(return_action_1_0,return_action_1_1)
 
         action = 0 if max_return_action_0 >= max_return_action_1 else 1
-        
         return action
 
-    def batch_update(self, replay_batch_states, update_tgt=False):
+    def minibatch_update(self, replay_batch_states, update_tgt=False):
         batch_states = []
         batch_q_values =[]
         # Gather target q_values from replay memory states
@@ -300,16 +322,21 @@ class Deep_Agent():
             ## thereby only loss of action taken is used in error term 
             q_values = self.model.predict(state)[0] 
             # Use target model for estimate of q(s',a')
-            q_value = reward + self.gamma * np.amax(self.model_target.predict(next_state)[0])
+            tgt_q_value = None
+            if DDQN:
+                act = np.argmax(self.model.predict(next_state)[0])
+                tgt_q_value = reward + self.gamma * self.model_target.model.predict(next_state)[0][act]
+            else:
+                tgt_q_value = reward + self.gamma * np.amax(self.model_target.model.predict(next_state)[0])
             if done:
                 q_values[action] = reward
             else:
-                q_values[action] = q_value
+                q_values[action] = tgt_q_value
             batch_states.append(state[0])
             batch_q_values.append(q_values)
 
         self.model.fit(np.array(batch_states), np.array(batch_q_values),
-                batch_size= self.batch_size, epochs=1, verbose=0)
+                batch_size= self.minibatch_size, epochs=1, verbose=0)
 
         if update_tgt:
             # Update the target model to the current model
@@ -341,10 +368,14 @@ class Deep_Agent():
         action =  self.epsilon_greedy_policy(q_values)
         next_state, reward, done, info = self.env.step(action)
 
-        # Do a batch update after each action taken
-        batch = self.memory.sample_batch(self.batch_size)
-        update_tgt_flag = step_number % self.n_steps_before_update_tgt == 0
-        self.batch_update(batch, update_tgt=update_tgt_flag)
+        # Do a batch update after kth action taken
+        update_tgt_flag = False
+        if not DDQN: ## TODO
+            update_tgt_flag = step_number % self.n_steps_before_update_tgt == 0
+        if step_number % self.k_steps_before_minibatch == 0:
+            minibatch = self.memory.sample_batch(self.minibatch_size)
+            self.minibatch_update(minibatch, update_tgt=update_tgt_flag)
+
     
         return action, (next_state, reward, done, info)
 
@@ -386,7 +417,7 @@ class Deep_Agent():
             if eps_counter % self.num_of_episodes_to_update_train_and_perf_curve == 0:
                 self.avg_training_episodes_return.append(sum(episodes_return)/self.num_of_episodes_to_update_train_and_perf_curve)
                 episodes_return = []
-            if eps_counter % 100 == 0:
+            if eps_counter % save_weights_num_episodes == 0:
                 filename = 'weights_'+str(self.env_name)+'_'+str(eps_counter)
                 print(filename)
                 self.model.save_model_weights(filename)
@@ -398,14 +429,14 @@ class Deep_Agent():
         plt.legend(loc='best')
         plt.show()
 
-    def test(self, n_test_episodes, model_file=None):
-		# Evaluate the performance of your agent over 100 episodes, by calculating cummulative rewards for the 100 episodes.
-		# Here you need to interact with the environment, irrespective of whether you are using a memory. 
-        total_return= 0
+    def test_stats(self, n_test_episodes, model_file=None):
+        # Returns the average reward over n_test_episodes of trained model
+        ## and standard deviation
+        total_returns = []
         for episode in range(n_test_episodes):
             state = self.env.reset()
             state = np.expand_dims(state,0)
-            returns = 0
+            total_return = 0
             done =False
             while not done:
                 q_values = self.model.predict(state)[0]
@@ -413,9 +444,15 @@ class Deep_Agent():
                 next_state, reward, done, info = self.env.step(action)
                 next_state = np.expand_dims(next_state,0)
                 state = next_state
-                returns += reward 
-            total_return += returns
-        print("total_returns=",total_return)
+                total_return += reward 
+            total_returns.append( total_return )
+
+        # Compute test stats    
+        average_test_return = np.mean(total_returns)
+        std_test_return = np.std(total_returns)
+        print("Mean total reward over %s episodes: %s +/- %s" % \
+                (n_test_episodes,  average_test_return, std_test_return))
+        return average_test_return, std_test_return
 
     def performance_plot_data(self,num_episodes, model_file=None):
         episodes_return = []
@@ -426,7 +463,8 @@ class Deep_Agent():
             done =False
             while not done:
                 q_values = self.model.predict(state)[0]
-                action =  self.epsilon_greedy_policy_005(q_values)
+                action =  self.epsilon_greedy_policy(q_values, 
+                                        force_epsilon=0.005)
                 next_state, reward, done, info = self.env.step(action)
                 next_state = np.expand_dims(next_state,0)
                 state = next_state
@@ -484,21 +522,6 @@ def parse_arguments():
     parser.add_argument('--model',dest='model_name',type=str, default="dqn")
     return parser.parse_args()
 
-def main(args):
-
-    args = parse_arguments()
-    environment_name = args.env
-
-    # Setting the session to allow growth, so it doesn't allocate all GPU memory.
-    gpu_ops = tf.GPUOptions(allow_growth=True)
-    config = tf.ConfigProto(gpu_options=gpu_ops)
-    sess = tf.Session(config=config)
-
-    # Setting this as the default tensorflow session.
-    keras.backend.tensorflow_backend.set_session(sess)
-
-    # You want to create an instance of the DQN_Agent class here, and then train / test it.
-
 if __name__ == '__main__':
 
     # Setting the session to allow growth, so it doesn't allocate all GPU memory.
@@ -514,9 +537,9 @@ if __name__ == '__main__':
     environment_name = args.env
     model_name = args.model_name
 
-    agent = Deep_Agent(environment_name, model_name, num_episodes=5, curve_episodes=1)
+    agent = Deep_Agent(environment_name, model_name, num_episodes=1000, curve_episodes=200)
     agent.burn_in_memory()
     agent.train()
-    agent.test(100)
+    u, std = agent.test_stats(100)  # 6.e
     agent.performance_curves_from_weight_files()
     agent.plots()
