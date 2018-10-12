@@ -27,11 +27,12 @@ minibatch_size = 32
 save_weights_num_episodes = 100
 steps_update_target_network_weights = 100
 k_steps_before_minibatch = 4 
-reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='my_metric', factor=0.1,
-                              patience=100, min_lr=0.0000001)
-def my_metric(y_true, y_pred): # for cartpole have to do something similar for MC
-     return keras.backend.sum(200 - y_pred)
- 
+
+def my_metric_CP(y_true, y_pred): 
+    return keras.backend.sum(200 - y_pred)
+def my_metric_MC(y_true, y_pred): 
+    return keras.backend.sum(110 + y_pred) 
+    
 steps_beyond_done = None
 def next_state_func(state, action):
         # copied from gym's cartpole.py
@@ -126,15 +127,22 @@ class QNetwork():
         mtype_s = 'DQN' if not is_double else 'DOUBLE'
         state_dim, Q_dim, lr, layers = self.ENV_INFO[mtype_s][environment_name]
         self.model = keras.models.Sequential(layers)
-        self.model.compile(metrics=[my_metric], loss='mse', optimizer=keras.optimizers.RMSprop(lr=lr))
-
+        if environment_name == 'CartPole-v0':
+            my_metric = my_metric_CP
+        if environment_name == 'MountainCar-v0':
+            my_metric = my_metric_MC    
+        self.model.compile(metrics=[my_metric], loss='mse', 
+                optimizer=keras.optimizers.RMSprop(lr=lr))
+        self.reduce_lr = keras.callbacks.ReduceLROnPlateau(
+                            monitor=my_metric.__name__, factor=0.1,
+                          patience=100, min_lr=0.0000001)
     def predict(self, state):
         # Return network predicted q-values for given state
         return self.model.predict(state)
 
     def fit(self, pred_values, true_values, **kwargs):
         # Fit the model we're training according to fit() API
-        return self.model.fit(pred_values, true_values, callbacks=[reduce_lr], **kwargs )
+        return self.model.fit(pred_values, true_values, callbacks=[self.reduce_lr], **kwargs )
 
     def set_weights(self, *args, **kwargs):
         # Set weights of model according to set_weights Keras API
@@ -168,6 +176,10 @@ class Dueling_QNetwork(QNetwork):
         # Define your network architecture here. It is also a good idea to define any training operations 
         # and optimizers here, initialize your variables, or alternately compile your model here.  
         state_dim, Q_dim, lr, layers  = self.ENV_INFO[environment_name]
+        if environment_name == 'CartPole-v0':
+            my_metric = my_metric_CP
+        if environment_name == 'MountainCar-v0':
+            my_metric = my_metric_MC
         
         inputs = keras.layers.Input(shape=state_dim)
         penult_dqn_layer = None
@@ -201,7 +213,8 @@ class Dueling_QNetwork(QNetwork):
                                     ([adv_out, sample_avg_adv])
         Q_vals = keras.layers.Lambda(lambda l_in: l_in[0]-l_in[1])\
                                     ([value_out, f_adv])
-        
+        self.reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor=my_metric.__name__, factor=0.1,
+                          patience=100, min_lr=0.0000001)
         self.model = keras.models.Model(inputs=inputs, outputs=Q_vals)
         self.model.compile(metrics=[my_metric], loss='mse', optimizer=keras.optimizers.RMSprop(lr=lr))
 
