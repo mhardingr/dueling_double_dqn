@@ -29,7 +29,7 @@ save_weights_num_episodes = 100
 steps_update_target_network_weights = 100
 k_steps_before_minibatch = 4 
 reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1,
-                              patience=200, min_lr=0.000001)
+                              patience=100, min_lr=0.0000001)
 
 
 steps_beyond_done = None
@@ -385,11 +385,11 @@ class Deep_Agent():
             minibatch = self.memory.sample_batch(self.minibatch_size)
             self.minibatch_update(minibatch, update_tgt=update_tgt_flag)
 
-            # If DDQN, then we need to randomly swap the two QNetworks
-        if self.is_DDQN: ## added by Ibrahim Fri 1:23AM 
-            shuffled_models = [self.model, self.model_target]
-            np.random.shuffle(shuffled_models)
-            self.model, self.model_target = shuffled_models
+                # If DDQN, then we need to randomly swap the two QNetworks
+            if self.is_DDQN: ## added by Ibrahim Fri 1:23AM 
+                shuffled_models = [self.model, self.model_target]
+                np.random.shuffle(shuffled_models)
+                self.model, self.model_target = shuffled_models
     
         return action, (next_state, reward, done, info)
 
