@@ -381,6 +381,7 @@ class Deep_Agent():
             self.minibatch_update(minibatch, update_tgt=update_tgt_flag)
 
             # If DDQN, then we need to randomly swap the two QNetworks
+        if self.is_DDQN: ## added by Ibrahim Fri 1:23AM 
             shuffled_models = [self.model, self.model_target]
             np.random.shuffle(shuffled_models)
             self.model, self.model_target = shuffled_models
