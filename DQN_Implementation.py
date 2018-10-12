@@ -10,14 +10,14 @@ import matplotlib.pyplot as plt
 import math 
 
 #hyperparameters
-hidden_layer1 = 8
-hidden_layer2 = 16
+hidden_layer1 = 32 
+hidden_layer2 = 32 
 hidden_layer3 = 32
 dueling_hidden_layer3 = 128
 gamma_CP =  0.99
 gamma_MC =  1
-burn_in_MC = 20000 # TODO number of episodes to burn_in for Mountain car (according to a piazza post)
-burn_in_CP = 10000 #TODO number of episodes to burn_in for Cartpole (according to a piazza post)
+burn_in_MC = 20000 
+burn_in_CP = 10000 
 mem_size = 50000
 initial_epsilon = 0.5
 final_epsilon = 0.05
@@ -88,28 +88,45 @@ class QNetwork():
 
     # Define mapping from environment name to 
     # list containing [state shape, n_actions, lr]
+    CP_STATE_DIMS = (4,)
+    MC_STATE_DIMS = (2,)
+    CP_Q_DIMS = 2
+    MC_Q_DIMS = 3
     DQN_LR_CP = 0.001
     DQN_LR_MC = 0.0001
     DOUBLE_LR_CP = 0.0001
     DOUBLE_LR_MC = 0.00001
-    ENV_INFO = {'DQN': {"CartPole-v0": [(4,), 2, DQN_LR_CP], 
-                    "MountainCar-v0": [(2,), 3, DQN_LR_MC]}, 
-                'DOUBLE' : {"CartPole-v0": [(4,), 2, DOUBLE_LR_CP], 
-                    "MountainCar-v0": [(2,), 3, DOUBLE_LR_MC]}}
+    DQN_LAYERS_MC = [
+            keras.layers.Dense(hidden_layer1, input_shape=MC_STATE_DIMS,
+                activation='relu'),
+            keras.layers.Dense(hidden_layer2, activation='relu'),
+            keras.layers.Dense(hidden_layer3, activation='relu'),
+            keras.layers.Dense(MC_Q_DIMS, activation='linear')
+            ]
+    DQN_LAYERS_CP = [
+            keras.layers.Dense(hidden_layer1, input_shape=CP_STATE_DIMS,
+                activation='relu'),
+            keras.layers.Dense(hidden_layer2, input_shape=CP_STATE_DIMS,
+                activation='relu'),
+            keras.layers.Dense(CP_Q_DIMS, activation='linear')
+            ]
+
+    ENV_INFO = {'DQN': {"CartPole-v0": [CP_STATE_DIMS, CP_Q_DIMS, 
+                                        DQN_LR_CP, DQN_LAYERS_CP], 
+                    "MountainCar-v0": [MC_STATE_DIMS, MC_Q_DIMS,
+                                        DQN_LR_MC, DQN_LAYERS_MC]}, 
+                'DOUBLE' : {"CartPole-v0": [CP_STATE_DIMS, CP_Q_DIMS,
+                                        DOUBLE_LR_CP, DQN_LAYERS_CP], 
+                    "MountainCar-v0": [MC_STATE_DIMS, MC_Q_DIMS,
+                                        DOUBLE_LR_MC, DQN_LAYERS_MC]}}
 
 
     def __init__(self, environment_name, is_double=False):
         # DQN network is instantiated using Keras
         mtype_s = 'DQN' if not is_double else 'DOUBLE'
-        state_dim, Q_dim, lr  = self.ENV_INFO[mtype_s][environment_name]
-        dqn_layers = [
-            keras.layers.Dense(hidden_layer1, input_shape=state_dim, activation='relu'),
-            keras.layers.Dense(hidden_layer2, activation='relu'),
-            keras.layers.Dense(hidden_layer3, activation='relu'),
-            keras.layers.Dense(Q_dim, activation='linear')
-            ]
-        self.model = keras.models.Sequential(dqn_layers)
-        self.model.compile(metrics=[my_metric], loss='mse', optimizer=keras.optimizers.Adam(lr=lr))
+        state_dim, Q_dim, lr, layers = self.ENV_INFO[mtype_s][environment_name]
+        self.model = keras.models.Sequential(layers)
+        self.model.compile(metrics=[my_metric], loss='mse', optimizer=keras.optimizers.RMSprop(lr=lr))
 
     def predict(self, state):
         # Return network predicted q-values for given state
@@ -150,16 +167,24 @@ class Dueling_QNetwork(QNetwork):
     def __init__(self, environment_name):
         # Define your network architecture here. It is also a good idea to define any training operations 
         # and optimizers here, initialize your variables, or alternately compile your model here.  
-        state_dim, Q_dim, lr  = self.ENV_INFO[environment_name]
+        state_dim, Q_dim, lr, layers  = self.ENV_INFO[environment_name]
         
         inputs = keras.layers.Input(shape=state_dim)
-        h0_out = keras.layers.Dense(hidden_layer1, activation='relu')(inputs)
-        h1_out = keras.layers.Dense(hidden_layer2, activation='relu')(h0_out)
+        penult_dqn_layer = None
+        if environment_name == "CartPole-v0":
+            print("Using Dueling network architecture for", environment_name)
+            h0_out = keras.layers.Dense(hidden_layer1, activation='relu')(inputs)
+            penult_dqn_layer = h0_out 
+        else:
+            print("Using Dueling network architecture for", environment_name)
+            h0_out = keras.layers.Dense(hidden_layer1, activation='relu')(inputs)
+            h1_out = keras.layers.Dense(hidden_layer2, activation='relu')(h0_out)
+            penult_dqn_layer = h1_out
         # We need to diverge the network architecture into 2 fully connected
         ## streams from the output of the h1
         # First, the state-value stream: a fully-connected layer of 128 units
         ## which is then passed through to a scalar output layer
-        h2_out_vs = keras.layers.Dense(dueling_hidden_layer3, activation='relu')(h1_out)
+        penult_dqn_out_vs = keras.layers.Dense(dueling_hidden_layer3, activation='relu')(penult_dqn_layer)
         value_out = keras.layers.Dense(1, activation='relu')(h2_out_vs)
         # In parallel, next, the advantage-value stream: similarly a fc layer of 128 units
         ## then passed to another fc layer with output size = Q_dim
@@ -178,7 +203,7 @@ class Dueling_QNetwork(QNetwork):
                                     ([value_out, f_adv])
         
         self.model = keras.models.Model(inputs=inputs, outputs=Q_vals)
-        self.model.compile(metrics=[my_metric], loss='mse', optimizer=keras.optimizers.Adam(lr=lr))
+        self.model.compile(metrics=[my_metric], loss='mse', optimizer=keras.optimizers.RMSprop(lr=lr))
 
 class Replay_Memory():
 
