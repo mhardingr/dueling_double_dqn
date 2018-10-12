@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Oct  7 09:54:24 2018
-
 @author: ibrahim, mharding
 """
 import keras, tensorflow as tf, numpy as np, gym, sys, copy, argparse
@@ -28,10 +27,11 @@ minibatch_size = 32
 save_weights_num_episodes = 100
 steps_update_target_network_weights = 100
 k_steps_before_minibatch = 4 
-reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1,
+reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='my_metric', factor=0.1,
                               patience=100, min_lr=0.0000001)
-
-
+def my_metric(y_true, y_pred): # for cartpole have to do something similar for MC
+     return keras.backend.sum(200 - y_pred)
+ 
 steps_beyond_done = None
 def next_state_func(state, action):
         # copied from gym's cartpole.py
@@ -109,7 +109,7 @@ class QNetwork():
             keras.layers.Dense(Q_dim, activation='linear')
             ]
         self.model = keras.models.Sequential(dqn_layers)
-        self.model.compile(loss='mse', optimizer=keras.optimizers.Adam(lr=lr))
+        self.model.compile(metrics=[my_metric], loss='mse', optimizer=keras.optimizers.Adam(lr=lr))
 
     def predict(self, state):
         # Return network predicted q-values for given state
@@ -178,7 +178,7 @@ class Dueling_QNetwork(QNetwork):
                                     ([value_out, f_adv])
         
         self.model = keras.models.Model(inputs=inputs, outputs=Q_vals)
-        self.model.compile(loss='mse', optimizer=keras.optimizers.Adam(lr=lr))
+        self.model.compile(metrics=[my_metric], loss='mse', optimizer=keras.optimizers.Adam(lr=lr))
 
 class Replay_Memory():
 
@@ -225,7 +225,7 @@ class Deep_Agent():
         self.is_DDQN = False
         if model_name == "dqn" or model_name == 'ddqn':
             if model_name == "dqn": 
-                print("DDQN model")
+                print("DQN model")
             if model_name == "ddqn":
                 print("DDQN model")
                 self.is_DDQN = True
