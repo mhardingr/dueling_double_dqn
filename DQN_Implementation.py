@@ -29,7 +29,7 @@ save_weights_num_episodes = 100
 steps_update_target_network_weights = 100
 k_steps_before_minibatch = 4 
 reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1,
-                              patience=200, min_lr=0.000001)
+                              patience=100, min_lr=0.0000001)
 
 
 steps_beyond_done = None
@@ -148,8 +148,8 @@ class Dueling_QNetwork(QNetwork):
                 "MountainCar-v0": [(2,), 3, LR_MC]}
 
     def __init__(self, environment_name):
-		# Define your network architecture here. It is also a good idea to define any training operations 
-		# and optimizers here, initialize your variables, or alternately compile your model here.  
+        # Define your network architecture here. It is also a good idea to define any training operations 
+        # and optimizers here, initialize your variables, or alternately compile your model here.  
         state_dim, Q_dim, lr  = self.ENV_INFO[environment_name]
         
         inputs = keras.layers.Input(shape=state_dim)
@@ -183,18 +183,18 @@ class Dueling_QNetwork(QNetwork):
 class Replay_Memory():
 
     def __init__(self, burn_in, memory_size=mem_size):
-		# The memory essentially stores transitions recorded from the agent
-		# taking actions in the environment.
+        # The memory essentially stores transitions recorded from the agent
+        # taking actions in the environment.
 
-		# Burn in episodes define the number of episodes that are written into the memory from the 
-		# randomly initialized agent. Memory size is the maximum size after which old elements in the memory are replaced. 
-		# A simple (if not the most efficient) was to implement the memory is as a list of transitions. 
+        # Burn in episodes define the number of episodes that are written into the memory from the 
+        # randomly initialized agent. Memory size is the maximum size after which old elements in the memory are replaced. 
+        # A simple (if not the most efficient) was to implement the memory is as a list of transitions. 
         self.memory = collections.deque(maxlen=memory_size)
         self.burn_in = burn_in
 
     def sample_batch(self, batch_size=32):
-		# This function returns a batch of randomly sampled transitions - i.e. state, action, reward, next state, terminal flag tuples. 
-		# You will feed this to your model to train.
+        # This function returns a batch of randomly sampled transitions - i.e. state, action, reward, next state, terminal flag tuples. 
+        # You will feed this to your model to train.
         batch = random.sample(self.memory, batch_size)
         return batch
 
@@ -204,34 +204,39 @@ class Replay_Memory():
 
 class Deep_Agent():
 
-	# In this class, we will implement functions to do the following. 
-	# (1) Create an instance of the Q Network class.
-	# (2) Create a function that constructs a policy from the Q values predicted by the Q Network. 
-	#		(a) Epsilon Greedy Policy.
-	# 		(b) Greedy Policy. 
-	# (3) Create a function to train the Q Network, by interacting with the environment.
-	# (4) Create a function to test the Q Network's performance on the environment.
-	# (5) Create a function for Experience Replay.
-	
+    # In this class, we will implement functions to do the following. 
+    # (1) Create an instance of the Q Network class.
+    # (2) Create a function that constructs a policy from the Q values predicted by the Q Network. 
+    #        (a) Epsilon Greedy Policy.
+    #         (b) Greedy Policy. 
+    # (3) Create a function to train the Q Network, by interacting with the environment.
+    # (4) Create a function to test the Q Network's performance on the environment.
+    # (5) Create a function for Experience Replay.
+    
     def __init__(self, environment_name, model_name, render=False, num_episodes=10000, curve_episodes=200):
 
-		# Create an instance of the network itself, as well as the memory. 
-		# Here is also a good place to set environmental parameters,
-		# as well as training parameters - number of episodes / iterations, etc. 
+        # Create an instance of the network itself, as well as the memory. 
+        # Here is also a good place to set environmental parameters,
+        # as well as training parameters - number of episodes / iterations, etc. 
         self.env_name = environment_name
         self.env = gym.make(environment_name)
 
         # Instantiate the models
         self.is_DDQN = False
         if model_name == "dqn" or model_name == 'ddqn':
+            if model_name == "dqn": 
+                print("DDQN model")
             if model_name == "ddqn":
+                print("DDQN model")
                 self.is_DDQN = True
+            self.model_name = model_name
             self.model = QNetwork(environment_name, is_double = self.is_DDQN)
             self.model_target = QNetwork(environment_name, is_double = self.is_DDQN)
         else:
-            # model_name == "dueling"
+            self.model_name = "dueling"
             self.model = Dueling_QNetwork(environment_name)
             self.model_target = Dueling_QNetwork(environment_name)
+            print("Dueling model")
 
 
         self.burn_in = burn_in_MC if environment_name == 'MountainCar-v0' else burn_in_CP
@@ -252,7 +257,7 @@ class Deep_Agent():
         self.avg_performance_episodes_return_2SLA = []
 
     def epsilon_greedy_policy(self, q_values, force_epsilon=None):
-		# Creating epsilon greedy probabilities to sample from.             
+        # Creating epsilon greedy probabilities to sample from.             
         eps = None
         if force_epsilon:
             eps = force_epsilon
@@ -267,7 +272,7 @@ class Deep_Agent():
         return action
 
     def greedy_policy(self, q_values):
-		# Creating greedy policy for test time. 
+        # Creating greedy policy for test time. 
         action = np.argmax(q_values)
         return action
 
@@ -385,20 +390,21 @@ class Deep_Agent():
             minibatch = self.memory.sample_batch(self.minibatch_size)
             self.minibatch_update(minibatch, update_tgt=update_tgt_flag)
 
-            # If DDQN, then we need to randomly swap the two QNetworks
-            shuffled_models = [self.model, self.model_target]
-            np.random.shuffle(shuffled_models)
-            self.model, self.model_target = shuffled_models
+                # If DDQN, then we need to randomly swap the two QNetworks
+            if self.is_DDQN: ## added by Ibrahim Fri 1:23AM 
+                shuffled_models = [self.model, self.model_target]
+                np.random.shuffle(shuffled_models)
+                self.model, self.model_target = shuffled_models
     
         return action, (next_state, reward, done, info)
 
     def train(self):
-		# In this function, we will train our network. 
-		# If training without experience replay_memory, then you will interact with the environment 
-		# in this function, while also updating your network parameters. 
+        # In this function, we will train our network. 
+        # If training without experience replay_memory, then you will interact with the environment 
+        # in this function, while also updating your network parameters. 
 
-		# If you are using a replay memory, you should interact with environment here, and store these 
-		# transitions to memory, while also updating your model.
+        # If you are using a replay memory, you should interact with environment here, and store these 
+        # transitions to memory, while also updating your model.
         eps_counter = 1
         episodes_return = []
         num_episodes_for_performance_curve = 20
@@ -431,7 +437,7 @@ class Deep_Agent():
                 self.avg_training_episodes_return.append(sum(episodes_return)/self.num_of_episodes_to_update_train_and_perf_curve)
                 episodes_return = []
             if eps_counter % save_weights_num_episodes == 0:
-                filename = 'weights_'+str(self.env_name)+'_'+str(eps_counter)
+                filename = 'weights_'+str(self.env_name)+'_'+str(self.model_name)+'_'+str(eps_counter)
                 print(filename)
                 self.model.save_model_weights(filename)
             eps_counter += 1
