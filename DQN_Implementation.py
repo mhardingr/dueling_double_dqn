@@ -28,6 +28,8 @@ minibatch_size = 32
 save_weights_num_episodes = 100
 steps_update_target_network_weights = 100
 k_steps_before_minibatch = 4 
+reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1,
+                              patience=200, min_lr=0.000001)
 
 
 steps_beyond_done = None
@@ -80,9 +82,9 @@ def next_state_func(state, action):
 
 class QNetwork():
 
-	# This class essentially defines the network architecture. 
-	# The network should take in state of the world as an input, 
-	# and output Q values of the actions available to the agent as the output. 
+    # This class essentially defines the network architecture. 
+    # The network should take in state of the world as an input, 
+    # and output Q values of the actions available to the agent as the output. 
 
     # Define mapping from environment name to 
     # list containing [state shape, n_actions, lr]
@@ -109,7 +111,7 @@ class QNetwork():
 
     def fit(self, pred_values, true_values, **kwargs):
         # Fit the model we're training according to fit() API
-        return self.model.fit(pred_values, true_values, **kwargs)
+        return self.model.fit(pred_values, true_values, callbacks=[reduce_lr], **kwargs )
 
     def set_weights(self, *args, **kwargs):
         # Set weights of model according to set_weights Keras API
@@ -120,7 +122,7 @@ class QNetwork():
         return self.model.get_weights(*args, **kwargs)
 
     def save_model_weights(self, suffix):
-		# Helper function to save your model / weights. 
+        # Helper function to save your model / weights. 
         self.model.save_weights(suffix)
 
     def load_model(self, model_file):
@@ -128,7 +130,7 @@ class QNetwork():
 		pass
 
     def load_model_weights(self,weight_file):
-		# Helper funciton to load model weights. 
+        # Helper funciton to load model weights. 
         self.model.load_weights(weight_file)
 
 class Dueling_QNetwork(QNetwork):
@@ -191,7 +193,7 @@ class Replay_Memory():
         return batch
 
     def append(self, transition):
-		# Appends transition to the memory. 	
+        # Appends transition to the memory.     
         self.memory.append(transition)
 
 class Deep_Agent():
@@ -346,8 +348,8 @@ class Deep_Agent():
             self.model_target.set_weights(self.model.get_weights())
 
     def burn_in_memory(self):
-		# Initialize your replay memory with a burn_in number of episodes / transitions. 
-        print "Burning in memory ...", self.memory.burn_in, "samples to collect."
+        # Initialize your replay memory with a burn_in number of episodes / transitions. 
+        print ("Burning in memory ...", self.memory.burn_in, "samples to collect.")
         state = self.env.reset()
         state = np.expand_dims(state,0)
         for i in range(self.memory.burn_in):
@@ -360,7 +362,7 @@ class Deep_Agent():
             else:
                 state = self.env.reset()
                 state = np.expand_dims(state,0)
-        print "Burn-in complete."
+        print ("Burn-in complete.")
 
     def step_and_update(self, state, step_number):
         # Returns 2-tuple of:
@@ -539,7 +541,7 @@ if __name__ == '__main__':
     environment_name = args.env
     model_name = args.model_name
 
-    agent = Deep_Agent(environment_name, model_name) 
+    agent = Deep_Agent(environment_name, model_name, num_episodes=10000, curve_episodes=200)
     agent.burn_in_memory()
     agent.train()
     u, std = agent.test_stats(100)  # 6.e
