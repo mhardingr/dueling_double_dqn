@@ -380,6 +380,10 @@ class Deep_Agent():
             minibatch = self.memory.sample_batch(self.minibatch_size)
             self.minibatch_update(minibatch, update_tgt=update_tgt_flag)
 
+            # If DDQN, then we need to randomly swap the two QNetworks
+            shuffled_models = [self.model, self.model_target]
+            np.random.shuffle(shuffled_models)
+            self.model, self.model_target = shuffled_models
     
         return action, (next_state, reward, done, info)
 
