@@ -16,8 +16,8 @@ hidden_layer3 = 32
 dueling_hidden_layer3 = 128
 gamma_CP =  0.99
 gamma_MC =  1
-burn_in_MC = 50 
-burn_in_CP = 1000 
+burn_in_MC = 10000
+burn_in_CP = 10000 
 mem_size = 50000
 initial_epsilon = 0.5
 final_epsilon = 0.05
@@ -437,7 +437,7 @@ class Deep_Agent():
 
     def burn_in_memory(self):
         # Initialize your replay memory with a burn_in number of episodes / transitions. 
-        print ("Burning in memory ...", self.memory.burn_in, "Episodes to collect.")
+        print ("Burning in memory ...", self.memory.burn_in, "samples to collect.")
         state = self.env.reset()
         state = np.expand_dims(state,0)
         for i in range(self.memory.burn_in):
