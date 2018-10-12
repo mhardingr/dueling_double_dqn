@@ -95,7 +95,7 @@ class QNetwork():
     MC_Q_DIMS = 3
     DQN_LR_CP = 0.001
     DQN_LR_MC = 0.0001
-    DOUBLE_LR_CP = 0.0001
+    DOUBLE_LR_CP = 0.001
     DOUBLE_LR_MC = 0.00001
     DQN_LAYERS_MC = [
             keras.layers.Dense(hidden_layer1, input_shape=MC_STATE_DIMS,
@@ -136,9 +136,9 @@ class QNetwork():
         self.reduce_lr = keras.callbacks.ReduceLROnPlateau(
                             monitor=my_metric.__name__, factor=0.1,
                           patience=100, min_lr=0.0000001)
-    def predict(self, state):
+    def predict(self, state, **kwargs):
         # Return network predicted q-values for given state
-        return self.model.predict(state)
+        return self.model.predict(state, **kwargs)
 
     def fit(self, pred_values, true_values, **kwargs):
         # Fit the model we're training according to fit() API
@@ -366,6 +366,44 @@ class Deep_Agent():
         action = 0 if max_return_action_0 >= max_return_action_1 else 1
         return action
 
+    def fast_minibatch_update(self, replay_batch, update_tgt=False):
+        # Split up axes of replay_batch buffer
+        states = np.array(map(lambda bs: bs[0], replay_batch))
+        actions = np.array(map(lambda bs: bs[1], replay_batch))
+        rewards = np.array(map(lambda bs: bs[2], replay_batch))
+        next_states = np.array(map(lambda bs: bs[3], replay_batch))
+        done_flags = np.array(map(lambda bs: bs[4], replay_batch))
+
+        # For states, next_states arrays, they have an additional dimension 
+        ## due to how they are saved, so we must squeeze them down one dim
+        states = np.squeeze(states)
+        next_states = np.squeeze(next_states)
+
+        # Gather target q_values from replay batch
+        batch_q_values_arr= self.model.predict(states)
+        tgt_q_values = None
+        if self.is_DDQN:
+            selected_actions = np.argmax(self.model.predict(next_states), axis=1)
+            # Outputs a vector tgt_q_values to save for actions
+            tgt_q_values = rewards + self.gamma * \
+                self.model_target.predict(next_states)[np.arange(len(next_states)), 
+                                            selected_actions]
+        else:
+            # Outputs a vector tgt_q_values to save for actions
+            tgt_q_values = rewards + self.gamma * \
+                    np.amax(self.model_target.predict(next_states), axis=1)
+
+        # Update q_values_mat according to computed target values
+        tgt_q_values[done_flags==True] = rewards[done_flags==True]
+        batch_q_values_arr[np.arange(len(states)), actions] = tgt_q_values
+
+        self.model.fit(states, batch_q_values_arr,
+                batch_size= self.minibatch_size, epochs=1, verbose=0)
+
+        if update_tgt:
+            # Update the target model to the current model
+            self.model_target.set_weights(self.model.get_weights())
+
     def minibatch_update(self, replay_batch_states, update_tgt=False):
         batch_states = []
         batch_q_values =[]
@@ -387,6 +425,8 @@ class Deep_Agent():
                 q_values[action] = tgt_q_value
             batch_states.append(state[0])
             batch_q_values.append(q_values)
+
+        return np.array(batch_states), np.array(batch_q_values)
 
         self.model.fit(np.array(batch_states), np.array(batch_q_values),
                 batch_size= self.minibatch_size, epochs=1, verbose=0)
@@ -426,9 +466,9 @@ class Deep_Agent():
         update_tgt_flag = not self.is_DDQN and step_number % self.n_steps_before_update_tgt == 0
         if step_number % self.k_steps_before_minibatch == 0:
             minibatch = self.memory.sample_batch(self.minibatch_size)
-            self.minibatch_update(minibatch, update_tgt=update_tgt_flag)
+            self.fast_minibatch_update(minibatch, update_tgt=update_tgt_flag)
 
-                # If DDQN, then we need to randomly swap the two QNetworks
+            # If DDQN, then we need to randomly swap the two QNetworks
             if self.is_DDQN: ## added by Ibrahim Fri 1:23AM 
                 shuffled_models = [self.model, self.model_target]
                 np.random.shuffle(shuffled_models)
