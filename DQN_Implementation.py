@@ -28,7 +28,6 @@ minibatch_size = 32
 save_weights_num_episodes = 100
 steps_update_target_network_weights = 100
 k_steps_before_minibatch = 4 
-DDQN = False
 
 
 steps_beyond_done = None
@@ -206,7 +205,7 @@ class Deep_Agent():
 	# (4) Create a function to test the Q Network's performance on the environment.
 	# (5) Create a function for Experience Replay.
 	
-    def __init__(self, environment_name, model_name, render=False, num_episodes=None, curve_episodes=None):
+    def __init__(self, environment_name, model_name, render=False, num_episodes=10000, curve_episodes=200):
 
 		# Create an instance of the network itself, as well as the memory. 
 		# Here is also a good place to set environmental parameters,
@@ -215,9 +214,13 @@ class Deep_Agent():
         self.env = gym.make(environment_name)
 
         # Instantiate the models
+        self.is_DDQN = False
         if model_name == "dqn" or model_name == 'ddqn':
             self.model = QNetwork(environment_name)
             self.model_target = QNetwork(environment_name)
+
+            if model_name == "ddqn":
+                self.is_DDQN = True
         else:
             # model_name == "dueling"
             self.model = Dueling_QNetwork(environment_name)
@@ -323,7 +326,7 @@ class Deep_Agent():
             q_values = self.model.predict(state)[0] 
             # Use target model for estimate of q(s',a')
             tgt_q_value = None
-            if DDQN:
+            if self.is_DDQN:
                 act = np.argmax(self.model.predict(next_state)[0])
                 tgt_q_value = reward + self.gamma * self.model_target.model.predict(next_state)[0][act]
             else:
@@ -370,8 +373,7 @@ class Deep_Agent():
 
         # Do a batch update after kth action taken
         update_tgt_flag = False
-        if not DDQN: ## TODO
-            update_tgt_flag = step_number % self.n_steps_before_update_tgt == 0
+        update_tgt_flag = step_number % self.n_steps_before_update_tgt == 0
         if step_number % self.k_steps_before_minibatch == 0:
             minibatch = self.memory.sample_batch(self.minibatch_size)
             self.minibatch_update(minibatch, update_tgt=update_tgt_flag)
@@ -537,7 +539,7 @@ if __name__ == '__main__':
     environment_name = args.env
     model_name = args.model_name
 
-    agent = Deep_Agent(environment_name, model_name, num_episodes=1000, curve_episodes=200)
+    agent = Deep_Agent(environment_name, model_name) 
     agent.burn_in_memory()
     agent.train()
     u, std = agent.test_stats(100)  # 6.e
