@@ -88,14 +88,20 @@ class QNetwork():
 
     # Define mapping from environment name to 
     # list containing [state shape, n_actions, lr]
-    LR_CP = 0.001
-    LR_MC = 0.0001
-    ENV_INFO = {"CartPole-v0": [(4,), 2, LR_CP], 
-                "MountainCar-v0": [(2,), 3, LR_MC]}
+    DQN_LR_CP = 0.001
+    DQN_LR_MC = 0.0001
+    DOUBLE_LR_CP = 0.0001
+    DOUBLE_LR_MC = 0.00001
+    ENV_INFO = {'DQN': {"CartPole-v0": [(4,), 2, DQN_LR_CP], 
+                    "MountainCar-v0": [(2,), 3, DQN_LR_MC]}, 
+                'DOUBLE' : {"CartPole-v0": [(4,), 2, DOUBLE_LR_CP], 
+                    "MountainCar-v0": [(2,), 3, DOUBLE_LR_MC]}}
 
-    def __init__(self, environment_name):
+
+    def __init__(self, environment_name, is_double=False):
         # DQN network is instantiated using Keras
-        state_dim, Q_dim, lr  = self.ENV_INFO[environment_name]
+        mtype_s = 'DQN' if not is_double else 'DOUBLE'
+        state_dim, Q_dim, lr  = self.ENV_INFO[mtype_s][environment_name]
         dqn_layers = [
             keras.layers.Dense(hidden_layer1, input_shape=state_dim, activation='relu'),
             keras.layers.Dense(hidden_layer2, activation='relu'),
@@ -127,7 +133,7 @@ class QNetwork():
 
     def load_model(self, model_file):
 		# Helper function to load an existing model.
-		pass
+        pass
 
     def load_model_weights(self,weight_file):
         # Helper funciton to load model weights. 
@@ -218,11 +224,10 @@ class Deep_Agent():
         # Instantiate the models
         self.is_DDQN = False
         if model_name == "dqn" or model_name == 'ddqn':
-            self.model = QNetwork(environment_name)
-            self.model_target = QNetwork(environment_name)
-
             if model_name == "ddqn":
                 self.is_DDQN = True
+            self.model = QNetwork(environment_name, is_double = self.is_DDQN)
+            self.model_target = QNetwork(environment_name, is_double = self.is_DDQN)
         else:
             # model_name == "dueling"
             self.model = Dueling_QNetwork(environment_name)
@@ -375,7 +380,7 @@ class Deep_Agent():
 
         # Do a batch update after kth action taken
         update_tgt_flag = False
-        update_tgt_flag = step_number % self.n_steps_before_update_tgt == 0
+        update_tgt_flag = not self.is_DDQN and step_number % self.n_steps_before_update_tgt == 0
         if step_number % self.k_steps_before_minibatch == 0:
             minibatch = self.memory.sample_batch(self.minibatch_size)
             self.minibatch_update(minibatch, update_tgt=update_tgt_flag)
