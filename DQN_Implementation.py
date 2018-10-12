@@ -397,7 +397,7 @@ class Deep_Agent():
 
     def burn_in_memory(self):
         # Initialize your replay memory with a burn_in number of episodes / transitions. 
-        print ("Burning in memory ...", self.memory.burn_in, "samples to collect.")
+        print ("Burning in memory ...", self.memory.burn_in, "Episodes to collect.")
         state = self.env.reset()
         state = np.expand_dims(state,0)
         for i in range(self.memory.burn_in):
