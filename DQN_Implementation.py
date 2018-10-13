@@ -94,9 +94,9 @@ class QNetwork():
     CP_Q_DIMS = 2
     MC_Q_DIMS = 3
     DQN_LR_CP = 0.001
-    DQN_LR_MC = 0.0001
+    DQN_LR_MC = 0.001
     DOUBLE_LR_CP = 0.001
-    DOUBLE_LR_MC = 0.00001
+    DOUBLE_LR_MC = 0.001
     DQN_LAYERS_MC = [
             keras.layers.Dense(hidden_layer1, input_shape=MC_STATE_DIMS,
                 activation='relu'),
@@ -175,7 +175,7 @@ class Dueling_QNetwork(QNetwork):
     def __init__(self, environment_name):
         # Define your network architecture here. It is also a good idea to define any training operations 
         # and optimizers here, initialize your variables, or alternately compile your model here.  
-        state_dim, Q_dim, lr, layers  = self.ENV_INFO[environment_name]
+        state_dim, Q_dim, lr  = self.ENV_INFO[environment_name]
         if environment_name == 'CartPole-v0':
             my_metric = my_metric_CP
         if environment_name == 'MountainCar-v0':
@@ -197,10 +197,10 @@ class Dueling_QNetwork(QNetwork):
         # First, the state-value stream: a fully-connected layer of 128 units
         ## which is then passed through to a scalar output layer
         penult_dqn_out_vs = keras.layers.Dense(dueling_hidden_layer3, activation='relu')(penult_dqn_layer)
-        value_out = keras.layers.Dense(1, activation='relu')(h2_out_vs)
+        value_out = keras.layers.Dense(1, activation='relu')(penult_dqn_out_vs)
         # In parallel, next, the advantage-value stream: similarly a fc layer of 128 units
         ## then passed to another fc layer with output size = Q_dim
-        h2_out_advs = keras.layers.Dense(dueling_hidden_layer3, activation='relu')(h1_out)
+        h2_out_advs = keras.layers.Dense(dueling_hidden_layer3, activation='relu')(penult_dqn_layer)
         adv_out  = keras.layers.Dense(Q_dim, activation='relu')(h2_out_advs)
 
         # Lastly, the output of the Dueling network is defined as a function
