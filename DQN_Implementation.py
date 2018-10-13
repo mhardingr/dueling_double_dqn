@@ -29,9 +29,9 @@ steps_update_target_network_weights = 100
 k_steps_before_minibatch = 4 
 
 def my_metric_CP(y_true, y_pred): 
-    return keras.backend.sum(200 - y_pred)
+    return  keras.backend.max(y_pred)
 def my_metric_MC(y_true, y_pred): 
-    return keras.backend.sum(110 + y_pred) 
+    return  keras.backend.max(y_pred)
     
 steps_beyond_done = None
 def next_state_func(state, action):
@@ -93,9 +93,9 @@ class QNetwork():
     MC_STATE_DIMS = (2,)
     CP_Q_DIMS = 2
     MC_Q_DIMS = 3
-    DQN_LR_CP = 0.001
-    DQN_LR_MC = 0.001
-    DOUBLE_LR_CP = 0.001
+    DQN_LR_CP = 0.0001
+    DQN_LR_MC = 0.0001
+    DOUBLE_LR_CP = 0.0001
     DOUBLE_LR_MC = 0.001
     DQN_LAYERS_MC = [
             keras.layers.Dense(hidden_layer1, input_shape=MC_STATE_DIMS,
@@ -132,10 +132,10 @@ class QNetwork():
         if environment_name == 'MountainCar-v0':
             my_metric = my_metric_MC    
         self.model.compile(metrics=[my_metric], loss='mse', 
-                optimizer=keras.optimizers.RMSprop(lr=lr))
+                optimizer=keras.optimizers.Adam(lr=lr))
         self.reduce_lr = keras.callbacks.ReduceLROnPlateau(
                             monitor=my_metric.__name__, factor=0.1,
-                          patience=100, min_lr=0.0000001)
+                          patience=100, min_lr=0.00000000001)
     def predict(self, state, **kwargs):
         # Return network predicted q-values for given state
         return self.model.predict(state, **kwargs)
@@ -163,6 +163,9 @@ class QNetwork():
     def load_model_weights(self,weight_file):
         # Helper funciton to load model weights. 
         self.model.load_weights(weight_file)
+    def on_epoch_end(self, epoch, logs=None):
+        lr = float(keras.backend.get_value(self.model.optimizer.lr))
+        return lr
 
 class Dueling_QNetwork(QNetwork):
     # Define mapping from environment name to 
@@ -322,7 +325,7 @@ class Deep_Agent():
             eps = force_epsilon
         else:
             # Decay epsilon, save and use
-            eps = max(self.final_epsilon, self.epsilon - (self.initial_epsilon - self.final_epsilon)/self.exploration_decay_steps)
+            eps = max(self.final_epsilon, self.epsilon - self.initial_epsilon/self.exploration_decay_steps)
             self.epsilon = eps
         if random.random() < eps:
             action = self.env.action_space.sample()
@@ -529,9 +532,7 @@ class Deep_Agent():
                 returns += reward 
 
             episodes_return.append(returns)
-            print("Episode: ", eps_counter," Reward: ", returns, "Epsilon:", self.epsilon,\
-                    "LR:", keras.backend.eval(self.model.model.optimizer.lr))
-
+            print("Episode: ", eps_counter," Reward: ", returns, "epsilon: ", self.epsilon, "LR: ", keras.backend.eval(self.model.model.optimizer.lr))#self.model.on_epoch_end(1))
             ## get the points of the training curve
             if eps_counter % self.num_of_episodes_to_update_train_and_perf_curve == 0:
                 self.avg_training_episodes_return.append(sum(episodes_return)/self.num_of_episodes_to_update_train_and_perf_curve)
@@ -558,6 +559,7 @@ class Deep_Agent():
             total_return = 0
             done =False
             while not done:
+                self.env.render()
                 q_values = self.model.predict(state)[0]
                 action = self.greedy_policy(q_values)
                 next_state, reward, done, info = self.env.step(action)
@@ -620,19 +622,43 @@ class Deep_Agent():
             filename = 'weights_'+str(self.env_name)+'_'+str(self.model_name)+'_'+str(indx)
             self.model.load_model_weights(filename)
             self.avg_performance_episodes_return.append(self.performance_plot_data(num_episodes_for_performance_curve))
-            self.avg_performance_episodes_return_2SLA.append(self.performance_plot_data_2_steps_LA(num_episodes_for_performance_curve))
+#            self.avg_performance_episodes_return_2SLA.append(self.performance_plot_data_2_steps_LA(num_episodes_for_performance_curve))
             
 
     def plots(self):
         plt.figure()
         plt.plot(self.avg_performance_episodes_return,label='performance_curve')
-        plt.plot(self.avg_performance_episodes_return_2SLA,label='performance_curve 2 steps look_ahead')
+#        plt.plot(self.avg_performance_episodes_return_2SLA,label='performance_curve 2 steps look_ahead')
         plt.xlabel('Training Epochs (1 epoch corresponds to '+str(self.num_of_episodes_to_update_train_and_perf_curve) + ' episodes)')
         plt.ylabel('Average Reward per Episode')
         plt.legend(loc='best')
         plt.show()
-
-
+        
+    def videos(self):
+        indices=[100, 3300, 6700, 10000, 200 ] #(0/3,1/3, 2/3, and 3/3 through the training process)
+        def check_eps(eps_id):
+            if eps_id == 0:
+                return True
+        for indx in indices:
+            filename = 'weights_'+str(self.env_name)+'_'+str(self.model_name)+'_'+str(indx)
+            print(indx)
+            self.env = gym.wrappers.Monitor(self.env, './videos/', video_callable=lambda episode_id : check_eps(episode_id), uid=str(indx),mode='evaluation',force=True if indx ==indices[0] else False,resume=False if indx ==indices[0] else True )
+            self.model.load_model_weights(filename)
+            for episode in range(1):
+                state = agent.env.reset()
+                state = np.expand_dims(state,0)
+                total_return = 0
+                done =False
+                while not done:
+                    agent.env.render()
+                    q_values = agent.model.predict(state)[0]
+                    action = agent.greedy_policy(q_values)
+                    next_state, reward, done, info = agent.env.step(action)
+                    next_state = np.expand_dims(next_state,0)
+                    state = next_state
+                    total_return += reward 
+                print("total returns from episode: ",total_return)
+            
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Deep Q Network Argument Parser')
     parser.add_argument('--env',dest='env',type=str, default='CartPole-v0')
