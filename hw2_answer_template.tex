@@ -165,7 +165,7 @@ For questions where you must fill in a blank, please make sure your final answer
             \begin{tcolorbox}[fit,height=1cm, width=9cm, blank, borderline={1pt}{1pt},nobeforeafter]
             \begin{center}
             \vspace{3mm}
-            [0.72, 0.34, -.84]
+            [0.72, 0.34, -0.84]
             \end{center}
             \end{tcolorbox}
             \vspace{0.8cm} \\
@@ -189,7 +189,7 @@ For questions where you must fill in a blank, please make sure your final answer
 \newpage
 \section*{Question 2 Policy Iteration and Value Iteration}
     \begin{tcolorbox}[fit,height=8cm, width=\textwidth, blank, borderline={1pt}{-2pt},nobeforeafter]
-    TODO: Policy iteration and Value Iteration algorithms have guaranteed convergence due critically to the Gamma contraction property of the tabular Bellman update operation. In other words, in finite MDPs, a Bellman update operation on any value function will monotonically improve the value function, which in turn can be used to create an improved policy. However, if a function approximator for V($s$) or Q($s,a$) is used instead of this finite tabular representation with proven convergence, then we lose the Gamma contraction property of the approximator updates. This is because a Bellman operation is not performed on the function approximator (as it is continuous), and therefore the updates cannot be guaranteed to strictly improve the Value or Q-value functions' continuous representations.
+    Policy iteration and Value Iteration algorithms have guaranteed convergence due critically to the Gamma contraction maaping property of the tabular Bellman update operation. In other words, in finite MDPs, a Bellman update operation on any value function will monotonically improve the value function, which in turn can be used to create an improved policy. However, if a function approximator for V($s$) or Q($s,a$) such as a neural network is used instead of this finite tabular representation, then we lose the Gamma contraction mapping property of the approximator updates. This is because an exact Bellman update operation may not be performed on the function approximator as there are no guarantees od convergence or the neural network might even diverge, and therefore the updates cannot be guaranteed to strictly improve the Value or Q-value functions.
     \end{tcolorbox}
 \newpage
 \section*{Question 3 Continuation Function}
@@ -199,7 +199,7 @@ For questions where you must fill in a blank, please make sure your final answer
     \begin{tcolorbox}[fit,height=12cm, width=\textwidth, blank, borderline={1pt}{-2pt},nobeforeafter]
     \begin{align}
     C(s_1,a_1) & = \gamma\sum_{s_2}T(s_1,a_1,s_2)\cdot V(s_2)\\
-    & =  \gamma\sum_{s_2}T(s_1,a_1,s_2) \cdot max_{a_2} ( R(s_2, a_2) + C(s_2, a_2))
+    & =  \gamma\sum_{s_2}T(s_1,a_1,s_2) \cdot \max_{a_2} ( R(s_2, a_2) + C(s_2, a_2))
     \end{align}
     (2) follows (1) as we can show that:
     \begin{align}
@@ -214,7 +214,7 @@ For questions where you must fill in a blank, please make sure your final answer
             \begin{tcolorbox}[fit,height=3cm, width=12cm, blank, borderline={1pt}{1pt},nobeforeafter]
             \begin{center}
             \vspace{3mm}
-            $$ V(s) = max_{a} (R(s,a) + C(s,a))$$
+            $$ V(s) = \max_{a} (R(s,a) + C(s,a))$$
             \end{center}
             \end{tcolorbox}
         \item \qquad
@@ -235,7 +235,7 @@ For questions where you must fill in a blank, please make sure your final answer
             \begin{tcolorbox}[fit,height=3cm, width=12cm, blank, borderline={1pt}{1pt},nobeforeafter]
             \begin{center}
             \vspace{3mm}
-            $$ C(s,a) = \gamma\sum_{s'}T(s,a,s')max_{a'}Q(s',a') $$
+            $$ C(s,a) = \gamma\sum_{s'}T(s,a,s')\max_{a'}Q(s',a') $$
             \end{center}
             \end{tcolorbox}
     \end{enumerate}
@@ -244,11 +244,12 @@ For questions where you must fill in a blank, please make sure your final answer
 \begin{enumerate}
     \item 
     \begin{tcolorbox}[fit,height=4cm, width=\textwidth, blank, borderline={1pt}{-2pt},nobeforeafter]
-    True, knowing $Q(s,a)$ is better than knowing $V(s)$ if we don't know $T, R$ because $Q(s,a)$ captures all necessary information from $T$ and $R$, and choosing optimal actions' values from $Q(s,a)$ can be used to compute $V(s)$ like: $V(s) = max_aQ(s,a)$.
+    True, knowing $Q(s,a)$ is better than knowing $V(s)$ if we don't know $T, R$ because $Q(s,a)$ captures all necessary information from $T$ and $R$, %, and choosing optimal actions' values from $Q(s,a)$ can be used to compute $V(s)$ like: $V(s) = \max_aQ(s,a)$.
+    since $\pi^*(s)=\argmax_a(Q(s,a))$ but if we use $V(s)$ to compute the optimal action we need to know $T(s,a,s')$ since  $\pi^*(s)=\argmax_a(R(s,a)+\gamma\sum_{s'}T(s,a,s') V(s'))$.
     \end{tcolorbox}
     \item 
     \begin{tcolorbox}[fit,height=4cm, width=\textwidth, blank, borderline={1pt}{-2pt},nobeforeafter]
-    False, knowing $C(s,a)$ is better because it captures $T$ whereas $V(s)$ still needs $T$ to compute state values and that information about $T$ is lacking. $V(s)$ can be computed using only $$V(s) = max_a ( R(s,a) + C(s,a))$$.
+    False, knowing $C(s,a)$ is better because it captures $T$ and we only need to know $R(s,a)$ whereas $V(s)$ still needs $T$ to compute state values and that information about $T$ is lacking. $\pi^*(s)$ can be computed using only $\pi^*(s) = \argmax_a ( R(s,a) + C(s,a))$.
     \end{tcolorbox}
 \end{enumerate}
 
@@ -274,7 +275,7 @@ For questions where you must fill in a blank, please make sure your final answer
 For 10 samples, expected value and variance: 0.5175211497062785 0.22445729082239635\\
 For 1000 samples, expected value and variance: 0.7801754107151546 0.7679549069879695\\
 For 10k samples, expected value and variance: 0.7900644740717525 0.764102137090607\\\\
-		As the number of samples increases, the sample mean approaches the expectation of $$f(x)$$ and the sample variance approaches the true variance. (seed used: 10703)\\
+		By the strong law of large numbers the as the number of samples increases, the sample mean and variance converges a.s to $\mathbf{E}_{~p}[f(x)]$ and ${\rm Var}(f(x))$ (seed used: 10703)\\
     \end{tcolorbox}
     \newpage 
     \item Importance Sampling \vspace{0.3cm} \\
@@ -291,28 +292,28 @@ Q(x) = $15/16\cdot x^2 \cdot (1+x)^2$:\\
 For 10 samples, expected value and variance: 0.7999999999999999 8.628166150854816e-33\\
 For 1000 samples, expected value and variance: 0.8000000000000002 3.4944072910962007e-32\\
 For 10k samples, expected value and variance: 0.8 1.1985755378701749e-32 \\
-(see used: 10703)\\
+(seed used: 10703)\\
 
-The proposal distribution $q(x) = 15/16x^2\cdot (1+x)^2$ gives the lowest variance. This is because the ratio of $p(x)/q_3(x)$ when multiplied with $f(x)$ equals a constant: $p(x)/q_3(x) \cdot f(x) = 8/15$. Therefore, the variance of $p/q_3\cdot f$ must be 0 using importance sampling from proposal distribution $q_3$. The $q_1 = N(3,1)$ proposal distribution converges the slowest because it samples most often outside of the range of $p$ since its mean is 3. Many samples were needed to inform the sample mean and sample variance about samples of $f(x)$ within the range of $p$.
+The proposal distribution $q(x) = 15/16x^2\cdot (1+x)^2$ gives the lowest variance. This is because its support of values is the same as that of $p(x)$, i.e. $-1 \le x \le 1$ and the ratio of $p(x)/q_3(x)$ when multiplied with $f(x)$ equals a constant: $p(x)/q_3(x) \cdot f(x) = 4/5$. Therefore, the variance of $p/q_3\cdot f$ must aprox. 0 using importance sampling from proposal distribution $q_3$. The $q_1 = N(3,1)$ proposal distribution converges the slowest because it samples most often outside the range $-1 \le x \le 1$  of $p(x)$ since its mean is 3. Many samples were needed to inform the sample mean and sample variance about samples of $f(x)$ within the range of $p$.
     \end{tcolorbox}
     
     \item Weighted Importance Sampling \vspace{0.3cm}\\
     \begin{tcolorbox}[fit,height=10cm, width=\textwidth, blank, borderline={1pt}{-2pt},nobeforeafter]
     Q(x) = norm(3,1):\\
-For 10 samples, expected value and variance: 0.16536750151498802 0.2461176950157861\\
-For 1000 samples, expected value and variance: 0.0006347482121569936 1.3890643153646337e-05\\
-For 10k samples, expected value and variance: 8.159765021680582e-05 3.4458174342661635e-07\\
+For 10 samples, expected value and variance: 1.65367501514988 \\
+For 1000 samples, expected value and variance: 0.6347482121569935 \\
+For 10k samples, expected value and variance: 0.8159765021680583 \\
 Q(x) = norm(0,1):\\
-For 10 samples, expected value and variance: 0.05678804940372946 0.012467270245523517\\
-For 1000 samples, expected value and variance: 0.000750091065121246 3.7630695856053437e-06\\
-For 10k samples, expected value and variance: 7.790952791280585e-05 4.116224962850043e-08\\
+For 10 samples, expected value and variance: 0.5678804940372946 \\
+For 1000 samples, expected value and variance: 0.750091065121246 \\
+For 10k samples, expected value and variance: 0.7790952791280585 \\
 Q(x) = $15/16*x^2*(1+x)^2$:\\
-For 10 samples, expected value and variance: 0.17487719726369466 5.39260384428426e-34\\
-For 1000 samples, expected value and variance: 0.0009252790478202625 4.2670444934849035e-38\\
-For 10k samples, expected value and variance: 8.9695323578219e-05 5.0950333268453525e-40\\
+For 10 samples, expected value and variance: 1.7487719726369466 \\
+For 1000 samples, expected value and variance: 0.9252790478202617 \\
+For 10k samples, expected value and variance: 0.8969532357821838 \\
 (seed used: 10703)\\
 
-In the weighted importance sampling, we see that the sample mean approaches a different value than importance sampling did, namely 0 in this case. This makes weighted importance sampling a biased estimator because the mean of $p(x)$, 0.8, is not the mean approached by this form of sampling.
+In the weighted importance sampling, we see that the sample mean approaches a different value than importance sampling did. Weighted importance sampling is a biased estimator.
     \end{tcolorbox}
 \end{enumerate}
 \newpage 
@@ -322,48 +323,48 @@ In the weighted importance sampling, we see that the sample mean approaches a di
         S0: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        5
         \end{center}
         \end{tcolorbox}
         \qquad
         S1: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        25
         \end{center}
         \end{tcolorbox}
         \qquad
         S2: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        20
         \end{center}
         \end{tcolorbox}
         \qquad
         S3: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        17
         \end{center}
         \end{tcolorbox} \vspace{0.8cm} \\
         S4: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        5
         \end{center}
         \end{tcolorbox}
         \qquad
         S5: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        -5
         \end{center}
         \end{tcolorbox}
         \qquad
         S6: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        -5
         \end{center}
         \end{tcolorbox}
         \qquad
@@ -372,48 +373,48 @@ In the weighted importance sampling, we see that the sample mean approaches a di
         S0: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+       20
         \end{center}
         \end{tcolorbox}
         \qquad
         S1: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        23
         \end{center}
         \end{tcolorbox}
         \qquad
         S2: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        21
         \end{center}
         \end{tcolorbox}
         \qquad
         S3: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        28
         \end{center}
         \end{tcolorbox} \vspace{0.8cm} \\
         S4: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        31
         \end{center}
         \end{tcolorbox}
         \qquad
         S5: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        23
         \end{center}
         \end{tcolorbox}
         \qquad
         S6: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        13
         \end{center}
         \end{tcolorbox}
         \qquad
@@ -422,49 +423,49 @@ In the weighted importance sampling, we see that the sample mean approaches a di
         S0: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        25.296875
         \end{center}
         \end{tcolorbox}
         \qquad
         S1: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        28.59375
         \end{center}
         \end{tcolorbox}
         \qquad
         S2: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        29.1875
         \end{center}
         \end{tcolorbox}
         \qquad
         S3: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        32.375
         \end{center}
         \end{tcolorbox} \vspace{0.8cm} \\
 
         S4: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        29.75
         \end{center}
         \end{tcolorbox}
         \qquad
         S5: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        20.5
         \end{center}
         \end{tcolorbox}
         \qquad
         S6: \begin{tcolorbox}[fit,height=1cm, width=2cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        13
         \end{center}
         \end{tcolorbox}
         \qquad
