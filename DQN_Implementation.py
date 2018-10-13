@@ -12,16 +12,16 @@ import math
 #hyperparameters
 hidden_layer1 = 64 
 hidden_layer2 = 64 
-hidden_layer3 =64 
+hidden_layer3 = 64 
 dueling_hidden_layer3 = 128  # TODO
 gamma_CP =  0.99
 gamma_MC =  1
 burn_in_MC = 10000
 burn_in_CP = 10000 
 mem_size = 50000
-initial_epsilon = 0.5 # TODO
-final_epsilon = 0.1 # TODO
-exploration_decay_steps = 10**5 # TODO
+g_initial_epsilon = 0.5 # TODO
+g_final_epsilon = 0.1 # TODO
+g_exploration_decay_steps = 5*10**5 # TODO
 num_episodes = 10000
 minibatch_size = 32
 save_weights_num_episodes = 100
@@ -167,15 +167,17 @@ class QNetwork():
 class Dueling_QNetwork(QNetwork):
     # Define mapping from environment name to 
     # list containing [state shape, n_actions, lr]
-    LR_CP = 0.001
+    LR_CP = 0.0001
+    STREAM_CP_HIDDEN_UNITS = 128
     LR_MC = 0.0001
-    ENV_INFO = {"CartPole-v0": [(4,), 2, LR_CP], 
+    ENV_INFO = {"CartPole-v0": [(4,), 2, LR_CP, STREAM_CP_HIDDEN_UNITS], 
                 "MountainCar-v0": [(2,), 3, LR_MC]}
 
     def __init__(self, environment_name):
         # Define your network architecture here. It is also a good idea to define any training operations 
         # and optimizers here, initialize your variables, or alternately compile your model here.  
-        state_dim, Q_dim, lr  = self.ENV_INFO[environment_name]
+        state_dim, Q_dim, lr, dueling_hidden_layer3 = \
+                self.ENV_INFO[environment_name]
         if environment_name == 'CartPole-v0':
             my_metric = my_metric_CP
         if environment_name == 'MountainCar-v0':
@@ -242,7 +244,13 @@ class Replay_Memory():
         self.memory.append(transition)
 
 class Deep_Agent():
+    DUEL_EPS_CP_INIT = 0.5
+    DUEL_EPS_CP_FINAL = 0.1
+    DUEL_EPS_CP_DECAY_STEPS = 5*10**5
 
+    DUEL_EPS_MC_INIT = 0.5
+    DUEL_EPS_MC_FINAL = 0.1
+    DUEL_EPS_MC_DECAY_STEPS = 5*10**5
     # In this class, we will implement functions to do the following. 
     # (1) Create an instance of the Q Network class.
     # (2) Create a function that constructs a policy from the Q values predicted by the Q Network. 
@@ -262,6 +270,9 @@ class Deep_Agent():
 
         # Instantiate the models
         self.is_DDQN = False
+        initial_epsilon = g_initial_epsilon 
+        final_epsilon = g_final_epsilon 
+        exploration_decay_steps = g_exploration_decay_steps 
         if model_name == "dqn" or model_name == 'ddqn':
             if model_name == "dqn": 
                 print("DQN model")
@@ -275,6 +286,15 @@ class Deep_Agent():
             self.model_name = "dueling"
             self.model = Dueling_QNetwork(environment_name)
             self.model_target = Dueling_QNetwork(environment_name)
+            if environment_name == "CartPole-v0":
+                initial_epsilon = self.DUEL_EPS_CP_INIT 
+                final_epsilon = self.DUEL_EPS_CP_FINAL 
+                exploration_decay_steps = self.DUEL_EPS_CP_DECAY_STEPS 
+            else:
+                initial_epsilon = self.DUEL_EPS_MC_INIT 
+                final_epsilon = self.DUEL_EPS_MC_FINAL 
+                exploration_decay_steps = self.DUEL_EPS_MC_DECAY_STEPS 
+
             print("Dueling model")
 
 
