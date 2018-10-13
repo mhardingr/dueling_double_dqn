@@ -10,18 +10,18 @@ import matplotlib.pyplot as plt
 import math 
 
 #hyperparameters
-hidden_layer1 = 32 
-hidden_layer2 = 32 
-hidden_layer3 = 32
-dueling_hidden_layer3 = 128
+hidden_layer1 = 64 
+hidden_layer2 = 64 
+hidden_layer3 = 64 
+dueling_hidden_layer3 = 128  # TODO
 gamma_CP =  0.99
 gamma_MC =  1
 burn_in_MC = 10000
 burn_in_CP = 10000 
 mem_size = 50000
-initial_epsilon = 0.5
-final_epsilon = 0.05
-exploration_decay_steps = 10**5
+g_initial_epsilon = 0.5 # TODO
+g_final_epsilon = 0.1 # TODO
+g_exploration_decay_steps = 5*10**5 # TODO
 num_episodes = 10000
 minibatch_size = 32
 save_weights_num_episodes = 100
@@ -94,9 +94,9 @@ class QNetwork():
     CP_Q_DIMS = 2
     MC_Q_DIMS = 3
     DQN_LR_CP = 0.001
-    DQN_LR_MC = 0.0001
+    DQN_LR_MC = 0.001
     DOUBLE_LR_CP = 0.001
-    DOUBLE_LR_MC = 0.00001
+    DOUBLE_LR_MC = 0.001
     DQN_LAYERS_MC = [
             keras.layers.Dense(hidden_layer1, input_shape=MC_STATE_DIMS,
                 activation='relu'),
@@ -167,15 +167,17 @@ class QNetwork():
 class Dueling_QNetwork(QNetwork):
     # Define mapping from environment name to 
     # list containing [state shape, n_actions, lr]
-    LR_CP = 0.001
+    LR_CP = 0.0001
+    STREAM_CP_HIDDEN_UNITS = 128
     LR_MC = 0.0001
-    ENV_INFO = {"CartPole-v0": [(4,), 2, LR_CP], 
+    ENV_INFO = {"CartPole-v0": [(4,), 2, LR_CP, STREAM_CP_HIDDEN_UNITS], 
                 "MountainCar-v0": [(2,), 3, LR_MC]}
 
     def __init__(self, environment_name):
         # Define your network architecture here. It is also a good idea to define any training operations 
         # and optimizers here, initialize your variables, or alternately compile your model here.  
-        state_dim, Q_dim, lr, layers  = self.ENV_INFO[environment_name]
+        state_dim, Q_dim, lr, dueling_hidden_layer3 = \
+                self.ENV_INFO[environment_name]
         if environment_name == 'CartPole-v0':
             my_metric = my_metric_CP
         if environment_name == 'MountainCar-v0':
@@ -197,10 +199,10 @@ class Dueling_QNetwork(QNetwork):
         # First, the state-value stream: a fully-connected layer of 128 units
         ## which is then passed through to a scalar output layer
         penult_dqn_out_vs = keras.layers.Dense(dueling_hidden_layer3, activation='relu')(penult_dqn_layer)
-        value_out = keras.layers.Dense(1, activation='relu')(h2_out_vs)
+        value_out = keras.layers.Dense(1, activation='relu')(penult_dqn_out_vs)
         # In parallel, next, the advantage-value stream: similarly a fc layer of 128 units
         ## then passed to another fc layer with output size = Q_dim
-        h2_out_advs = keras.layers.Dense(dueling_hidden_layer3, activation='relu')(h1_out)
+        h2_out_advs = keras.layers.Dense(dueling_hidden_layer3, activation='relu')(penult_dqn_layer)
         adv_out  = keras.layers.Dense(Q_dim, activation='relu')(h2_out_advs)
 
         # Lastly, the output of the Dueling network is defined as a function
@@ -213,10 +215,11 @@ class Dueling_QNetwork(QNetwork):
                                     ([adv_out, sample_avg_adv])
         Q_vals = keras.layers.Lambda(lambda l_in: l_in[0]-l_in[1])\
                                     ([value_out, f_adv])
-        self.reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor=my_metric.__name__, factor=0.1,
+        self.reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor=my_metric.__name__, factor=0.5,
                           patience=100, min_lr=0.0000001)
         self.model = keras.models.Model(inputs=inputs, outputs=Q_vals)
-        self.model.compile(metrics=[my_metric], loss='mse', optimizer=keras.optimizers.RMSprop(lr=lr))
+        self.model.compile(metrics=[my_metric], loss='mse', 
+                optimizer=keras.optimizers.Adam(lr=lr))
 
 class Replay_Memory():
 
@@ -241,7 +244,13 @@ class Replay_Memory():
         self.memory.append(transition)
 
 class Deep_Agent():
+    DUEL_EPS_CP_INIT = 0.5
+    DUEL_EPS_CP_FINAL = 0.1
+    DUEL_EPS_CP_DECAY_STEPS = 5*10**5
 
+    DUEL_EPS_MC_INIT = 0.5
+    DUEL_EPS_MC_FINAL = 0.1
+    DUEL_EPS_MC_DECAY_STEPS = 5*10**5
     # In this class, we will implement functions to do the following. 
     # (1) Create an instance of the Q Network class.
     # (2) Create a function that constructs a policy from the Q values predicted by the Q Network. 
@@ -261,6 +270,9 @@ class Deep_Agent():
 
         # Instantiate the models
         self.is_DDQN = False
+        initial_epsilon = g_initial_epsilon 
+        final_epsilon = g_final_epsilon 
+        exploration_decay_steps = g_exploration_decay_steps 
         if model_name == "dqn" or model_name == 'ddqn':
             if model_name == "dqn": 
                 print("DQN model")
@@ -274,6 +286,15 @@ class Deep_Agent():
             self.model_name = "dueling"
             self.model = Dueling_QNetwork(environment_name)
             self.model_target = Dueling_QNetwork(environment_name)
+            if environment_name == "CartPole-v0":
+                initial_epsilon = self.DUEL_EPS_CP_INIT 
+                final_epsilon = self.DUEL_EPS_CP_FINAL 
+                exploration_decay_steps = self.DUEL_EPS_CP_DECAY_STEPS 
+            else:
+                initial_epsilon = self.DUEL_EPS_MC_INIT 
+                final_epsilon = self.DUEL_EPS_MC_FINAL 
+                exploration_decay_steps = self.DUEL_EPS_MC_DECAY_STEPS 
+
             print("Dueling model")
 
 
@@ -301,7 +322,7 @@ class Deep_Agent():
             eps = force_epsilon
         else:
             # Decay epsilon, save and use
-            eps = max(self.final_epsilon, self.epsilon - self.initial_epsilon/self.exploration_decay_steps)
+            eps = max(self.final_epsilon, self.epsilon - (self.initial_epsilon - self.final_epsilon)/self.exploration_decay_steps)
             self.epsilon = eps
         if random.random() < eps:
             action = self.env.action_space.sample()
@@ -508,7 +529,8 @@ class Deep_Agent():
                 returns += reward 
 
             episodes_return.append(returns)
-            print("Episode: ", eps_counter," Reward: ", returns)
+            print("Episode: ", eps_counter," Reward: ", returns, "Epsilon:", self.epsilon,\
+                    "LR:", keras.backend.eval(self.model.model.optimizer.lr))
 
             ## get the points of the training curve
             if eps_counter % self.num_of_episodes_to_update_train_and_perf_curve == 0:

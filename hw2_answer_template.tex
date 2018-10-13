@@ -261,28 +261,59 @@ For questions where you must fill in a blank, please make sure your final answer
         Expectation: \begin{tcolorbox}[fit,height=1cm, width=3cm, blank, borderline={1pt}{1pt},nobeforeafter]
         \begin{center}
         \vspace{3mm}
-        %solution
+        0.8 
         \end{center}
         \end{tcolorbox} \vspace{5mm}\\
         Variance: \hspace{0.47cm} \begin{tcolorbox}[fit,height=1cm, width=3cm, blank, borderline={1pt}{1pt},nobeforeafter]
             \begin{center}
             \vspace{3mm}
-            %solution
+            0.774286 
             \end{center}
             \end{tcolorbox}  
     \item Direct Sampling \vspace{0.3cm} \\
     \begin{tcolorbox}[fit,height=10cm, width=\textwidth, blank, borderline={1pt}{-2pt},nobeforeafter]
-    %solution
+For 10 samples, expected value and variance: 0.5175211497062785 0.22445729082239635\\
+For 1000 samples, expected value and variance: 0.7801754107151546 0.7679549069879695\\
+For 10k samples, expected value and variance: 0.7900644740717525 0.764102137090607\\\\
+		By the strong law of large numbers the as the number of samples increases, the sample mean and variance converges a.s to $\mathbf{E}_{~p}[f(x)]$ and ${\rm Var}(f(x))$ (seed used: 10703)\\
     \end{tcolorbox}
     \newpage 
     \item Importance Sampling \vspace{0.3cm} \\
     \begin{tcolorbox}[fit,height=10cm, width=\textwidth, blank, borderline={1pt}{-2pt},nobeforeafter]
-    %solution
+    Q(x) = norm(3,1):\\
+For 10 samples, expected value and variance: 4.295353386364986 166.05054642381438\\
+For 1000 samples, expected value and variance: 1.2630579295295916 55.00040929485666\\
+For 10k samples, expected value and variance: 0.8143918731813137 34.32446852702005\\
+Q(x) = norm(0,1):\\
+For 10 samples, expected value and variance: 0.35818306780353104 0.49598389429460665\\
+For 1000 samples, expected value and variance: 0.7440814888529712 3.703013244355498\\
+For 10k samples, expected value and variance: 0.7658318235847844 3.9772672572375267\\
+Q(x) = $15/16\cdot x^2 \cdot (1+x)^2$:\\
+For 10 samples, expected value and variance: 0.7999999999999999 8.628166150854816e-33\\
+For 1000 samples, expected value and variance: 0.8000000000000002 3.4944072910962007e-32\\
+For 10k samples, expected value and variance: 0.8 1.1985755378701749e-32 \\
+(seed used: 10703)\\
+
+The proposal distribution $q(x) = 15/16x^2\cdot (1+x)^2$ gives the lowest variance. This is because its support of values is the same as that of $p(x)$, i.e. $-1 \le x \le 1$ and the ratio of $p(x)/q_3(x)$ when multiplied with $f(x)$ equals a constant: $p(x)/q_3(x) \cdot f(x) = 4/5$. Therefore, the variance of $p/q_3\cdot f$ must aprox. 0 using importance sampling from proposal distribution $q_3$. The $q_1 = N(3,1)$ proposal distribution converges the slowest because it samples most often outside the range $-1 \le x \le 1$  of $p(x)$ since its mean is 3. Many samples were needed to inform the sample mean and sample variance about samples of $f(x)$ within the range of $p$.
     \end{tcolorbox}
     
     \item Weighted Importance Sampling \vspace{0.3cm}\\
     \begin{tcolorbox}[fit,height=10cm, width=\textwidth, blank, borderline={1pt}{-2pt},nobeforeafter]
-    %solution
+    Q(x) = norm(3,1):\\
+For 10 samples, expected value and variance: 1.65367501514988 \\
+For 1000 samples, expected value and variance: 0.6347482121569935 \\
+For 10k samples, expected value and variance: 0.8159765021680583 \\
+Q(x) = norm(0,1):\\
+For 10 samples, expected value and variance: 0.5678804940372946 \\
+For 1000 samples, expected value and variance: 0.750091065121246 \\
+For 10k samples, expected value and variance: 0.7790952791280585 \\
+Q(x) = $15/16*x^2*(1+x)^2$:\\
+For 10 samples, expected value and variance: 1.7487719726369466 \\
+For 1000 samples, expected value and variance: 0.9252790478202617 \\
+For 10k samples, expected value and variance: 0.8969532357821838 \\
+(seed used: 10703)\\
+
+In the weighted importance sampling, we see that the sample mean approaches a different value than importance sampling did. Weighted importance sampling is a biased estimator.
     \end{tcolorbox}
 \end{enumerate}
 \newpage 
