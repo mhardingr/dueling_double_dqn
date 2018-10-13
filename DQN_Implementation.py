@@ -595,7 +595,7 @@ class Deep_Agent():
         step = 200
         num_episodes_for_performance_curve = 20
         for indx in range(start, stop,step):
-            filename = 'weights_'+str(self.env_name)+'_'+str(indx)
+            filename = 'weights_'+str(self.env_name)+'_'+str(self.model_name)+'_'+str(indx)
             self.model.load_model_weights(filename)
             self.avg_performance_episodes_return.append(self.performance_plot_data(num_episodes_for_performance_curve))
             self.avg_performance_episodes_return_2SLA.append(self.performance_plot_data_2_steps_LA(num_episodes_for_performance_curve))
