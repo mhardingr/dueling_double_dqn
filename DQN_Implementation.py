@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 import math 
 
 #hyperparameters
-hidden_layer1 = 64 
-hidden_layer2 = 64 
-hidden_layer3 = 64 
-dueling_hidden_layer3 = 128  # TODO
+hidden_layer1 = 100 
+hidden_layer2 = 100 
+hidden_layer3 = 32 
+dueling_hidden_layer3 = 100# TODO
 gamma_CP =  0.99
 gamma_MC =  1
 burn_in_MC = 10000
@@ -21,7 +21,7 @@ burn_in_CP = 10000
 mem_size = 50000
 g_initial_epsilon = 0.5 # TODO
 g_final_epsilon = 0.1 # TODO
-g_exploration_decay_steps = 5*10**5 # TODO
+g_exploration_decay_steps = 10**5 # TODO
 num_episodes = 10000
 minibatch_size = 32
 save_weights_num_episodes = 100
@@ -169,9 +169,10 @@ class Dueling_QNetwork(QNetwork):
     # list containing [state shape, n_actions, lr]
     LR_CP = 0.0001
     STREAM_CP_HIDDEN_UNITS = 128
+    STREAM_MC_HIDDEN_UNITS = dueling_hidden_layer3 
     LR_MC = 0.0001
     ENV_INFO = {"CartPole-v0": [(4,), 2, LR_CP, STREAM_CP_HIDDEN_UNITS], 
-                "MountainCar-v0": [(2,), 3, LR_MC]}
+                "MountainCar-v0": [(2,), 3, LR_MC, STREAM_MC_HIDDEN_UNITS]}
 
     def __init__(self, environment_name):
         # Define your network architecture here. It is also a good idea to define any training operations 
@@ -250,7 +251,7 @@ class Deep_Agent():
 
     DUEL_EPS_MC_INIT = 0.5
     DUEL_EPS_MC_FINAL = 0.1
-    DUEL_EPS_MC_DECAY_STEPS = 5*10**5
+    DUEL_EPS_MC_DECAY_STEPS = 3*10**6
     # In this class, we will implement functions to do the following. 
     # (1) Create an instance of the Q Network class.
     # (2) Create a function that constructs a policy from the Q values predicted by the Q Network. 
