@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 import math 
 
 #hyperparameters
-hidden_layer1 = 64 
-hidden_layer2 = 64 
-hidden_layer3 = 32 
-dueling_hidden_layer3 = 64# TODO
+hidden_layer1 = 256 
+hidden_layer2 = 256 
+hidden_layer3 = 256 
+dueling_hidden_layer3 = 256 # TODO
 gamma_CP =  0.99
 gamma_MC =  1
 burn_in_MC = 10000
@@ -27,7 +27,7 @@ minibatch_size = 32
 save_weights_num_episodes = 100
 steps_update_target_network_weights = 100
 k_steps_before_minibatch = 16 
-k_frames_between_actions = 4
+k_frames_between_actions = 1 
 
 def my_metric_CP(y_true, y_pred): 
     return  keras.backend.max(y_pred)
@@ -129,14 +129,14 @@ class QNetwork():
         state_dim, Q_dim, lr, layers = self.ENV_INFO[mtype_s][environment_name]
         self.model = keras.models.Sequential(layers)
         if environment_name == 'CartPole-v0':
-            my_metric = my_metric_CP
+            self.my_metric = my_metric_CP
         if environment_name == 'MountainCar-v0':
-            my_metric = my_metric_MC    
-        self.model.compile(metrics=[my_metric], loss='mse', 
+            self.my_metric = my_metric_MC    
+        self.model.compile(metrics=[self.my_metric], loss='mse', 
                 optimizer=keras.optimizers.Adam(lr=lr))
         self.reduce_lr = keras.callbacks.ReduceLROnPlateau(
-                            monitor=my_metric.__name__, factor=0.1,
-                          patience=100, min_lr=0.00000000001)
+                            monitor='loss', factor=0.1,
+                          patience=10, min_lr=0.00000000001)
     def predict(self, state, **kwargs):
         # Return network predicted q-values for given state
         return self.model.predict(state, **kwargs)
@@ -174,7 +174,7 @@ class Dueling_QNetwork(QNetwork):
     LR_CP = 0.0001
     STREAM_CP_HIDDEN_UNITS = 128
     STREAM_MC_HIDDEN_UNITS = dueling_hidden_layer3 
-    LR_MC = 0.01
+    LR_MC = 0.00008
     ENV_INFO = {"CartPole-v0": [(4,), 2, LR_CP, STREAM_CP_HIDDEN_UNITS], 
                 "MountainCar-v0": [(2,), 3, LR_MC, STREAM_MC_HIDDEN_UNITS]}
 
@@ -184,9 +184,9 @@ class Dueling_QNetwork(QNetwork):
         state_dim, Q_dim, lr, dueling_hidden_layer3 = \
                 self.ENV_INFO[environment_name]
         if environment_name == 'CartPole-v0':
-            my_metric = my_metric_CP
+            self.my_metric = my_metric_CP
         if environment_name == 'MountainCar-v0':
-            my_metric = my_metric_MC
+            self.my_metric = my_metric_MC
         
         inputs = keras.layers.Input(shape=state_dim)
         penult_dqn_layer = None
@@ -198,7 +198,8 @@ class Dueling_QNetwork(QNetwork):
             print("Using Dueling network architecture for", environment_name)
             h0_out = keras.layers.Dense(hidden_layer1, activation='relu')(inputs)
             h1_out = keras.layers.Dense(hidden_layer2, activation='relu')(h0_out)
-            penult_dqn_layer = h1_out
+            h2_out = keras.layers.Dense(hidden_layer3, activation='relu')(h1_out)
+            penult_dqn_layer = h2_out
         # We need to diverge the network architecture into 2 fully connected
         ## streams from the output of the h1
         # First, the state-value stream: a fully-connected layer of 128 units
@@ -220,11 +221,11 @@ class Dueling_QNetwork(QNetwork):
                                     ([adv_out, sample_avg_adv])
         Q_vals = keras.layers.Lambda(lambda l_in: l_in[0]-l_in[1])\
                                     ([value_out, f_adv])
-        self.reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor=my_metric.__name__, factor=0.5,
-                          patience=100, min_lr=0.0000001)
+        self.reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.5,
+                          patience=1, min_lr=0.0000001, verbose=1)
         self.model = keras.models.Model(inputs=inputs, outputs=Q_vals)
-        self.model.compile(metrics=[my_metric], loss='mse', 
-                optimizer=keras.optimizers.RMSprop(lr=lr, decay=1.0-10e-5))
+        self.model.compile(metrics=[self.my_metric], loss='mse', 
+                optimizer=keras.optimizers.RMSprop(lr=lr))
 
 class Replay_Memory():
 
@@ -251,11 +252,11 @@ class Replay_Memory():
 class Deep_Agent():
     DUEL_EPS_CP_INIT = 0.5
     DUEL_EPS_CP_FINAL = 0.1
-    DUEL_EPS_CP_DECAY_STEPS = 5*10**5
+    DUEL_EPS_CP_DECAY_STEPS = 5*10**4
 
     DUEL_EPS_MC_INIT = 0.7
-    DUEL_EPS_MC_FINAL = 0.05
-    DUEL_EPS_MC_DECAY_STEPS = 3*10**5
+    DUEL_EPS_MC_FINAL = 0.1
+    DUEL_EPS_MC_DECAY_STEPS = 8*10**4
     # In this class, we will implement functions to do the following. 
     # (1) Create an instance of the Q Network class.
     # (2) Create a function that constructs a policy from the Q values predicted by the Q Network. 
@@ -425,13 +426,14 @@ class Deep_Agent():
         tgt_q_values[done_flags==True] = rewards[done_flags==True]
         batch_q_values_arr[np.arange(len(states)), actions] = tgt_q_values
 
-        self.model.fit(states, batch_q_values_arr,
+        history = self.model.fit(states, batch_q_values_arr,
                 batch_size= self.minibatch_size, epochs=1, verbose=0)
 
         if update_tgt:
             # Update the target model to the current model
             self.model_target.set_weights(self.model.get_weights())
-
+    
+        return history
     def minibatch_update(self, replay_batch_states, update_tgt=False):
         batch_states = []
         batch_q_values =[]
@@ -497,9 +499,10 @@ class Deep_Agent():
         # Do a batch update after kth action taken
         update_tgt_flag = False
         update_tgt_flag = not self.is_DDQN and step_number % self.n_steps_before_update_tgt == 0
+        history = None
         if step_number % self.k_steps_before_minibatch == 0:
             minibatch = self.memory.sample_batch(self.minibatch_size)
-            self.fast_minibatch_update(minibatch, update_tgt=update_tgt_flag)
+            history = self.fast_minibatch_update(minibatch, update_tgt=update_tgt_flag)
 
             # If DDQN, then we need to randomly swap the two QNetworks
             if self.is_DDQN: ## added by Ibrahim Fri 1:23AM 
@@ -507,7 +510,7 @@ class Deep_Agent():
                 np.random.shuffle(shuffled_models)
                 self.model, self.model_target = shuffled_models
     
-        return action, (next_state, reward, done, info)
+        return action, (next_state, reward, done, info), history
 
     def train(self):
         # In this function, we will train our network. 
@@ -532,8 +535,10 @@ class Deep_Agent():
             returns = 0
             done = False
             prev_action = None
+            batch_lrs = []
+            eps_metrics = []
             while not done:
-                action, step_info = self.step_and_update(state, n_steps, prev_action=prev_action)
+                action, step_info, history = self.step_and_update(state, n_steps, prev_action=prev_action)
                 next_state, reward, done, _ = step_info
                 n_steps += 1
                 next_state = np.expand_dims(next_state,0)
@@ -541,9 +546,15 @@ class Deep_Agent():
                 state = next_state
                 returns += reward 
                 prev_action = action
-
+                if history:
+                    #eps_metrics.append(history.history[self.model.my_metric.__name__])
+                    batch_lrs.append(history.history['lr'])
+                    eps_metrics.append(history.history['loss'])
+            eps_avg_metric = np.max(eps_metrics)    
+            eps_avg_lr = np.mean(batch_lrs)
             episodes_return.append(returns)
-            print("Episode: ", eps_counter," Reward: ", returns, "epsilon: ", self.epsilon, "LR: ", keras.backend.eval(self.model.model.optimizer.lr))#self.model.on_epoch_end(1))
+            print("Episode: ", eps_counter," Reward: ", returns, "epsilon: ", self.epsilon, "LR: ", eps_avg_lr,\
+                    "Avg loss:", eps_avg_metric )#self.model.on_epoch_end(1))
             ## get the points of the training curve
             if eps_counter % self.num_of_episodes_to_update_train_and_perf_curve == 0:
                 self.avg_training_episodes_return.append(sum(episodes_return)/self.num_of_episodes_to_update_train_and_perf_curve)
