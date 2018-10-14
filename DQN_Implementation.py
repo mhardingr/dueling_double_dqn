@@ -10,13 +10,13 @@ import matplotlib.pyplot as plt
 import math 
 
 #hyperparameters
-hidden_layer1 = 24 
-hidden_layer2 = 24 
-hidden_layer3 = 24 
-dueling_hidden_layer3 = 32# TODO
+hidden_layer1 = 256 
+hidden_layer2 = 256 
+hidden_layer3 = 256 
+dueling_hidden_layer3 = 256 # TODO
 gamma_CP =  0.99
 gamma_MC =  1
-burn_in_MC = 20000
+burn_in_MC = 10000
 burn_in_CP = 10000 
 mem_size = 50000
 g_initial_epsilon = 0.5 # TODO
@@ -26,8 +26,8 @@ num_episodes = 10000
 minibatch_size = 32
 save_weights_num_episodes = 100
 steps_update_target_network_weights = 100
-k_steps_before_minibatch = 4 
-k_frames_between_actions = 8 
+k_steps_before_minibatch = 16 
+k_frames_between_actions = 1 
 
 def my_metric_CP(y_true, y_pred): 
     return  keras.backend.max(y_pred)
@@ -135,8 +135,8 @@ class QNetwork():
         self.model.compile(metrics=[self.my_metric], loss='mse', 
                 optimizer=keras.optimizers.Adam(lr=lr))
         self.reduce_lr = keras.callbacks.ReduceLROnPlateau(
-                            monitor=self.my_metric.__name__, factor=0.1,
-                          patience=100, min_lr=0.00000000001)
+                            monitor='loss', factor=0.1,
+                          patience=10, min_lr=0.00000000001)
     def predict(self, state, **kwargs):
         # Return network predicted q-values for given state
         return self.model.predict(state, **kwargs)
@@ -174,7 +174,7 @@ class Dueling_QNetwork(QNetwork):
     LR_CP = 0.0001
     STREAM_CP_HIDDEN_UNITS = 128
     STREAM_MC_HIDDEN_UNITS = dueling_hidden_layer3 
-    LR_MC = 0.00005
+    LR_MC = 0.00008
     ENV_INFO = {"CartPole-v0": [(4,), 2, LR_CP, STREAM_CP_HIDDEN_UNITS], 
                 "MountainCar-v0": [(2,), 3, LR_MC, STREAM_MC_HIDDEN_UNITS]}
 
@@ -221,11 +221,11 @@ class Dueling_QNetwork(QNetwork):
                                     ([adv_out, sample_avg_adv])
         Q_vals = keras.layers.Lambda(lambda l_in: l_in[0]-l_in[1])\
                                     ([value_out, f_adv])
-        self.reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor=self.my_metric.__name__, factor=0.5,
-                          patience=100, min_lr=0.0000001)
+        self.reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.5,
+                          patience=1, min_lr=0.0000001, verbose=1)
         self.model = keras.models.Model(inputs=inputs, outputs=Q_vals)
         self.model.compile(metrics=[self.my_metric], loss='mse', 
-                optimizer=keras.optimizers.Adam(lr=lr))
+                optimizer=keras.optimizers.RMSprop(lr=lr))
 
 class Replay_Memory():
 
@@ -254,9 +254,9 @@ class Deep_Agent():
     DUEL_EPS_CP_FINAL = 0.1
     DUEL_EPS_CP_DECAY_STEPS = 5*10**4
 
-    DUEL_EPS_MC_INIT = 0.5
+    DUEL_EPS_MC_INIT = 0.7
     DUEL_EPS_MC_FINAL = 0.1
-    DUEL_EPS_MC_DECAY_STEPS = 2*10**5
+    DUEL_EPS_MC_DECAY_STEPS = 8*10**4
     # In this class, we will implement functions to do the following. 
     # (1) Create an instance of the Q Network class.
     # (2) Create a function that constructs a policy from the Q values predicted by the Q Network. 
@@ -535,6 +535,7 @@ class Deep_Agent():
             returns = 0
             done = False
             prev_action = None
+            batch_lrs = []
             eps_metrics = []
             while not done:
                 action, step_info, history = self.step_and_update(state, n_steps, prev_action=prev_action)
@@ -547,10 +548,12 @@ class Deep_Agent():
                 prev_action = action
                 if history:
                     #eps_metrics.append(history.history[self.model.my_metric.__name__])
+                    batch_lrs.append(history.history['lr'])
                     eps_metrics.append(history.history['loss'])
-            eps_avg_metric = np.mean(eps_metrics)    
+            eps_avg_metric = np.max(eps_metrics)    
+            eps_avg_lr = np.mean(batch_lrs)
             episodes_return.append(returns)
-            print("Episode: ", eps_counter," Reward: ", returns, "epsilon: ", self.epsilon, "LR: ", keras.backend.eval(self.model.model.optimizer.lr),\
+            print("Episode: ", eps_counter," Reward: ", returns, "epsilon: ", self.epsilon, "LR: ", eps_avg_lr,\
                     "Avg loss:", eps_avg_metric )#self.model.on_epoch_end(1))
             ## get the points of the training curve
             if eps_counter % self.num_of_episodes_to_update_train_and_perf_curve == 0:
