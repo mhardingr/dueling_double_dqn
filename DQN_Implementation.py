@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 import math 
 
 #hyperparameters
-hidden_layer1 = 100 
-hidden_layer2 = 100 
+hidden_layer1 = 64 
+hidden_layer2 = 64 
 hidden_layer3 = 32 
-dueling_hidden_layer3 = 100# TODO
+dueling_hidden_layer3 = 64# TODO
 gamma_CP =  0.99
 gamma_MC =  1
 burn_in_MC = 10000
@@ -26,7 +26,8 @@ num_episodes = 10000
 minibatch_size = 32
 save_weights_num_episodes = 100
 steps_update_target_network_weights = 100
-k_steps_before_minibatch = 4 
+k_steps_before_minibatch = 16 
+k_frames_between_actions = 4
 
 def my_metric_CP(y_true, y_pred): 
     return  keras.backend.max(y_pred)
@@ -173,7 +174,7 @@ class Dueling_QNetwork(QNetwork):
     LR_CP = 0.0001
     STREAM_CP_HIDDEN_UNITS = 128
     STREAM_MC_HIDDEN_UNITS = dueling_hidden_layer3 
-    LR_MC = 0.0001
+    LR_MC = 0.01
     ENV_INFO = {"CartPole-v0": [(4,), 2, LR_CP, STREAM_CP_HIDDEN_UNITS], 
                 "MountainCar-v0": [(2,), 3, LR_MC, STREAM_MC_HIDDEN_UNITS]}
 
@@ -223,7 +224,7 @@ class Dueling_QNetwork(QNetwork):
                           patience=100, min_lr=0.0000001)
         self.model = keras.models.Model(inputs=inputs, outputs=Q_vals)
         self.model.compile(metrics=[my_metric], loss='mse', 
-                optimizer=keras.optimizers.Adam(lr=lr))
+                optimizer=keras.optimizers.RMSprop(lr=lr, decay=1.0-10e-5))
 
 class Replay_Memory():
 
@@ -252,9 +253,9 @@ class Deep_Agent():
     DUEL_EPS_CP_FINAL = 0.1
     DUEL_EPS_CP_DECAY_STEPS = 5*10**5
 
-    DUEL_EPS_MC_INIT = 0.5
-    DUEL_EPS_MC_FINAL = 0.1
-    DUEL_EPS_MC_DECAY_STEPS = 3*10**6
+    DUEL_EPS_MC_INIT = 0.7
+    DUEL_EPS_MC_FINAL = 0.05
+    DUEL_EPS_MC_DECAY_STEPS = 3*10**5
     # In this class, we will implement functions to do the following. 
     # (1) Create an instance of the Q Network class.
     # (2) Create a function that constructs a policy from the Q values predicted by the Q Network. 
@@ -274,6 +275,7 @@ class Deep_Agent():
 
         # Instantiate the models
         self.is_DDQN = False
+        self.skip_frames = False
         initial_epsilon = g_initial_epsilon 
         final_epsilon = g_final_epsilon 
         exploration_decay_steps = g_exploration_decay_steps 
@@ -298,6 +300,7 @@ class Deep_Agent():
                 initial_epsilon = self.DUEL_EPS_MC_INIT 
                 final_epsilon = self.DUEL_EPS_MC_FINAL 
                 exploration_decay_steps = self.DUEL_EPS_MC_DECAY_STEPS 
+                self.skip_frames = True
 
             print("Dueling model")
 
@@ -477,13 +480,18 @@ class Deep_Agent():
                 state = np.expand_dims(state,0)
         print ("Burn-in complete.")
 
-    def step_and_update(self, state, step_number):
+    def step_and_update(self, state, step_number, prev_action=None):
         # Returns 2-tuple of:
         ## (action, (next_state, reward, done, info) )
         ## action is chosen action of eps greedy policy for dqn
         ## (next_state, reward, done, info) is output of env.step(action)
-        q_values = self.model.predict(state)[0]
-        action =  self.epsilon_greedy_policy(q_values)
+        action = None
+        if self.skip_frames and step_number % k_frames_between_actions == 0 \
+                and prev_action:
+            action = prev_action   
+        else:
+            q_values = self.model.predict(state)[0]
+            action =  self.epsilon_greedy_policy(q_values)
         next_state, reward, done, info = self.env.step(action)
 
         # Do a batch update after kth action taken
@@ -523,14 +531,16 @@ class Deep_Agent():
             state = np.expand_dims(state,0)
             returns = 0
             done = False
+            prev_action = None
             while not done:
-                action, step_info = self.step_and_update(state, n_steps)
+                action, step_info = self.step_and_update(state, n_steps, prev_action=prev_action)
                 next_state, reward, done, _ = step_info
                 n_steps += 1
                 next_state = np.expand_dims(next_state,0)
                 self.memory.append((state, action, reward, next_state, done))
                 state = next_state
                 returns += reward 
+                prev_action = action
 
             episodes_return.append(returns)
             print("Episode: ", eps_counter," Reward: ", returns, "epsilon: ", self.epsilon, "LR: ", keras.backend.eval(self.model.model.optimizer.lr))#self.model.on_epoch_end(1))
