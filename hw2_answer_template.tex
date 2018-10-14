@@ -43,11 +43,12 @@
 \usepackage{multirow}
 \usepackage{wasysym}
 \usepackage{cancel}
-
+\usepackage{float}
 \usepackage{listings}
 \usepackage{color}
 \usepackage[thinlines]{easytable}
-
+\usepackage{booktabs}
+\usepackage{rotating}
 
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\blackcircle}{\tikz\draw[black,fill=black] (0,0) circle (1ex);}
@@ -474,18 +475,159 @@ In the weighted importance sampling, we see that the sample mean approaches a di
 \newpage
 \section*{Question 6 Programming Question}
     \begin{tcolorbox}[fit,height=22cm, width=\textwidth, blank, borderline={1pt}{-2pt},nobeforeafter]
-    %solution
+    {\large 6.1, 6.2, 6.3 (a)}
+	\begin{table}[H]
+		\centering
+		\caption{Implementation settings}
+		\begin{tabular}{|c|p{7.785em}|l|l|r|}
+			\cline{2-5}    \multicolumn{1}{r|}{} & Settings & \multicolumn{1}{p{7.93em}|}{DQN} & \multicolumn{1}{p{7.93em}|}{DDQN} & \multicolumn{1}{p{7.5em}|}{Dueling} \\
+			\hline
+			\multirow{10}[20]{*}{\begin{sideways}CartPole-v0\end{sideways}} & NN MLP Architecture  & \multicolumn{1}{p{7.93em}|}{2 hidden layers each of size 32 with relu activation} & \multicolumn{1}{p{7.93em}|}{2 hidden layers each of size 60 with relu activation} &  \\
+			\cline{2-5}          & optimizer & \multicolumn{1}{p{7.93em}|}{Adam} & \multicolumn{1}{p{7.93em}|}{Adam} &  \\
+			\cline{2-5}          & Burn-in transitions & 10000 & 10000 &  \\
+			\cline{2-5}          & Initial epsilon & 0.5   & 1     &  \\
+			\cline{2-5}          & Final epsilon & 0.1   & 0.1   &  \\
+			\cline{2-5}          & Exploration decay steps & \multicolumn{1}{p{7.93em}|}{$2\times10^5$} & \multicolumn{1}{p{7.93em}|}{$2\times10^5$} &  \\
+			\cline{2-5}          & minibatch size & 32    & 32    &  \\
+			\cline{2-5}          & no. of steps until target network is updated & 100   & 100   &  \\
+			\cline{2-5}          & steps before minibatch & 4     & 1     &  \\
+			\cline{2-5}          & learning rate & 0.0001 & 0.0001 &  \\
+			\hline
+			\multirow{10}[20]{*}{\begin{sideways}MountainCar-v0\end{sideways}} & NN MLP Architecture  & \multicolumn{1}{p{7.93em}|}{3 hidden layers each of size 60 with relu activation} & \multicolumn{1}{p{7.93em}|}{3 hidden layers each of size 60 with relu activation} &  \\
+			\cline{2-5}          & optimizer & \multicolumn{1}{p{7.93em}|}{Adam} & \multicolumn{1}{p{7.93em}|}{Adam} &  \\
+			\cline{2-5}          & Burn-in transitions & 10000 & 10000 &  \\
+			\cline{2-5}          & Initial epsilon & 0.5   & 1     &  \\
+			\cline{2-5}          & Final epsilon & 0.1   & 0.1   &  \\
+			\cline{2-5}          & Exploration decay steps & \multicolumn{1}{p{7.93em}|}{$2\times10^5$} & \multicolumn{1}{p{7.93em}|}{$2\times10^5$} &  \\
+			\cline{2-5}          & minibatch size & 32    & 32    &  \\
+			\cline{2-5}          & no. of steps until target network is updated & 100   & 100   &  \\
+			\cline{2-5}          & steps before minibatch & 4     & 4     &  \\
+			\cline{2-5}          & learning rate & 0.0001 & 0.00007 &  \\
+			\hline
+		\end{tabular}%
+		\label{tab1}%
+	\end{table}%
+     
     \end{tcolorbox}
     \begin{tcolorbox}[fit,height=22cm, width=\textwidth, blank, borderline={1pt}{-2pt},nobeforeafter]
-    %solution
+    {\large 6.1 (b) and (c)} \\
+    {\large CartPole-v0 DQN training and performace plots:} \\
+    \includegraphics[width=.5\textwidth]{figures/CP_dqn_training_curve}
+    \includegraphics[width=.5\textwidth]{figures/CP_dqn_performance_curve}
+    The training curve shows that our agent have learned to perform optimally in CartPole after about 25 epochs where it is stabilized there after. \\
+    The performance curves show that the two step look ahead policy performes better than the greedy policy w.r.t Q, where Q is learned from DQN, this result is expected, except at some point around 10 epochs in the training. This could be due to the fact the agent haven't learned Q values close to the true Q values just yet, we see however that this behavior is no longer the case after around 20 epochs where Q has converged to the true values.\\
+    \\
+    {\large Mountaincar-v0 DQN training and performace plots:} \\
+    \includegraphics[width=.5\textwidth]{figures/MC_dqn_training_curve}
+    \includegraphics[width=.5\textwidth]{figures/MC_dqn_performance_curve}
+	The training curve shows that our agent took about 27 training epochs in order to learn the Q value that induce a policy that reaches the flag in Mountain Car. The reason behind this could be due to the fact that Mountain car is a harder environment than cartPole since a random policy which we start with is highly unlikely to reach the flag. This problem could be mitigated by having the NN model predict initially Q values that are some how optimitic. The training curve seems to have converged to average values between -130 and -120 at the end training (min $\epsilon=0.1$ is reached), which is pretty good for this environment.  \\
+	The performance curves using $\epsilon$-greedy policy ($\epsilon$=0.05) is consistent with the training curve. The average reward per episode seems to be around -115 near the end of training.   \\
+	{\large 6.1 (d):} please refer to the submitted videos. \\
+	{\large 6.1 (e):} The below table was generated using a \textbf{greedy} policy. The results shows that our agent was able to pass all episodes with max reward for CartPole and performs very well with $  $MountainCar (can reach the flag by approx. 110 steps on avg.).
+	\vspace*{-0.6cm}
+    \begin{table}[H]
+	\centering
+	\caption{ \small DQN: Avg. total reward per 100 episode +/- std.}
+	\vspace*{-0.3cm}
+	\begin{tabular}{|p{13em}|r|}
+		\hline
+		\textbf{\footnotesize Setting} & \multicolumn{1}{p{10.645em}|}{\textbf{ \footnotesize mean $\pm$ std.}} \\
+		\hline
+		{\footnotesize CartPole DQN} & \multicolumn{1}{l|}{200.0 $\pm$ 0.0} \\
+		\hline
+		{\footnotesize CartPole DQN 2-step LA} & \multicolumn{1}{l|}{200.0 $\pm$ 0.0} \\
+		\hline
+		{\footnotesize MountainCar DQN} & \multicolumn{1}{l|}{-109.85 $\pm$ 11.6115} \\
+		\hline
+	\end{tabular}%
+	\label{tabDQN}%
+	\end{table}%    
+	
+
+	
+	
     \end{tcolorbox}
     \begin{tcolorbox}[fit,height=22cm, width=\textwidth, blank, borderline={1pt}{-2pt},nobeforeafter]
-    %solution
+    {\large 6.2  (b) and (c)} \\
+    {\large CartPole-v0 DDQN training and performace plots:} \\
+    \includegraphics[width=.5\textwidth]{figures/CP_ddqn_training_curve}
+    \includegraphics[width=.5\textwidth]{figures/CP_ddqn_performance_curve}
+    The training curve for DDQN shows that our agent have learned to perform optimally in CartPole after about 15 epochs where it is stabilized there after. \\
+    The performance curve shows that the agent have learnt to act optimally where the average reward achieved per episode after 20 epochs is the maximum achievable.\\
+    Compared to DQN, DDQN performes consistently better since it solves the Q-values overestimation problem of DQN.
+    \\
+   	{\large Mountaincar-v0 DDQN training and performace plots:} \\
+    \includegraphics[width=.5\textwidth]{figures/MC_ddqn_training_curve}
+    \includegraphics[width=.5\textwidth]{figures/MC_ddqn_performance_curve}
+   	The training curve for DDQN shows that our agent took about 24 training epochs in order to learn the Q values that induce a policy that reaches the flag in Mountain Car. It also shows that our agent is learning consistently overtime where the avg. reward per episode hits -120 towards the end of training. It is worth mentioning that in our case finding the right hyperparameters for the DDQN to achieve this performance in MountainCar was not an easy task.  \\
+    The performance curves using $\epsilon$-greedy policy ($\epsilon$=0.05) is consistent with the training curve. The average reward per episode seems to be around -115 on average near the end of training.   \\
+    DDQN seems to have less effect w.r.t DQN results on this environment the reason may be that fact that it was harder for us to find the best parameters for DDQN. Perhaps better results could be achieved with more parameter tweaking.\\
+    {\large 6.1 (d):} please refer to the submitted videos. \\
+    {\large 6.1 (e):} The below table was generated using a \textbf{greedy} policy. The results shows that our agent was able to pass all episodes with max reward for CartPole and performs very well with $  $MountainCar (can reach the flag by approx. 108 steps on avg.). Note that the mean and std. for MountainCar are better than that of DQN.
+    \vspace*{-0.6cm}
+      \begin{table}[H]
+    	\centering
+    	\caption{ \footnotesize DDQN: Avg. total reward per 100 episode +/- std.}
+    	\vspace*{-0.4cm}
+    	\begin{tabular}{|p{9.43em}|r|}
+    		\hline
+    		\textbf{\footnotesize Setting} & \multicolumn{1}{p{10.645em}|}{\textbf{ \footnotesize mean $\pm$ std.}} \\
+    		\hline
+    		{\footnotesize CartPole DDQN} & \multicolumn{1}{l|}{\footnotesize 200.0 $\pm$ 0.0} \\
+    		\hline
+    		{\footnotesize MountainCar DDQN} & \multicolumn{1}{l|}{\footnotesize -108.59 $\pm$ 9.8347} \\
+    		\hline
+    	\end{tabular}%
+    	\label{tabDDQN}%
+    \end{table}%
     \end{tcolorbox}
     \begin{tcolorbox}[fit,height=22cm, width=\textwidth, blank, borderline={1pt}{-2pt},nobeforeafter]
-    %solution
+    {\large 6.3  (b) and (c)} \\
+    {\large CartPole-v0 Dueling training and performace plots:} \\
+    insert plots here\\
+    {\large Mountaincar-v0 Dueling training and performace plots:} \\
+    insert plots here\\
+    {\large 6.3 (d):} please refer to the submitted videos. \\
+    {\large 6.3 (e):} The below table was generated using a \textbf{greedy} policy.
+        \begin{table}[H]
+    	\centering
+    	\caption{ Dueling:  Avg. total reward per 100 episode +/- std.}
+    	\begin{tabular}{|p{9.43em}|r|}
+    		\hline
+    		\textbf{\small Setting} & \multicolumn{1}{p{10.645em}|}{\textbf{ \small mean $\pm$ std.}} \\
+    		\hline
+    		{\small CartPole Dueling} &  \\
+    		\hline
+    		{\small MountainCar Dueling} &  \\
+    		\hline
+    	\end{tabular}%
+    	\label{tab4}%
+    \end{table}%
     \end{tcolorbox}
     \begin{tcolorbox}[fit,height=22cm, width=\textwidth, blank, borderline={1pt}{-2pt},nobeforeafter]
-    %solution
+        \begin{table}[H]
+    	\centering
+    	\caption{ Summary: Avg. total reward per 100 episode +/- std.}
+    	\begin{tabular}{|p{9.43em}|r|}
+    		\hline
+    		\textbf{\small Setting} & \multicolumn{1}{p{10.645em}|}{\textbf{ \small mean $\pm$ std.}} \\
+    		\hline
+    		{\small CartPole DQN} & \multicolumn{1}{l|}{200.0 $\pm$ 0.0} \\
+    		\hline
+    		{\small CartPole DQN} \newline{} {\small(2 step look ahead)} & \multicolumn{1}{l|}{200.0 $\pm$ 0.0} \\
+    		\hline
+    		{\small CartPole DDQN} & \multicolumn{1}{l|}{200.0 $\pm$ 0.0} \\
+    		\hline
+    		{\small CartPole Dueling} &  \\
+    		\hline
+    		{\small MountainCar DQN} & \multicolumn{1}{l|}{-109.85 $\pm$ 11.6115} \\
+    		\hline
+    		{\small MountainCar DDQN} & \multicolumn{1}{l|}{-108.59 $\pm$ 9.8347} \\
+    		\hline
+    		{\small MountainCar Dueling} &  \\
+    		\hline
+    	\end{tabular}%
+    	\label{tab5}%
+    \end{table}%
     \end{tcolorbox}
 \end{document}
