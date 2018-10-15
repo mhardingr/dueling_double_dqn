@@ -13,21 +13,21 @@ import math
 hidden_layer1 = 32 
 hidden_layer2 = 32 
 hidden_layer3 = 32 
-dueling_hidden_layer3 = 32 # TODO
 gamma_CP =  0.99
 gamma_MC =  1
 burn_in_MC = 10000
 burn_in_CP = 10000 
 mem_size = 50000
-g_initial_epsilon = 0.5 # TODO
-g_final_epsilon = 0.1 # TODO
-g_exploration_decay_steps = 10**5 # TODO
+g_initial_epsilon = 0.5 
+g_final_epsilon = 0.1 
+g_exploration_decay_steps = 10**5 
 num_episodes = 10000
 minibatch_size = 32 
 save_weights_num_episodes = 100
-steps_update_target_network_weights = 64 
-k_steps_before_minibatch = 16 
-k_frames_between_actions = 1 
+steps_update_target_network_weights = 32 
+k_steps_before_minibatch = 4 
+# Motivated by experimental setup, para 3 of arXiv Atari DQN paper
+k_frames_between_actions = 2  
 
 def my_metric_CP(y_true, y_pred): 
     return  keras.backend.max(y_pred)
@@ -75,8 +75,6 @@ def next_state_func(state, action):
             steps_beyond_done = 0
             reward = 1.0
         else:
-#            if steps_beyond_done == 0:
-#                logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
             steps_beyond_done += 1
             reward = 0.0
         return np.array(state), reward, done, {}
@@ -173,15 +171,15 @@ class Dueling_QNetwork(QNetwork):
     # list containing [state shape, n_actions, lr]
     LR_CP = 0.0001
     STREAM_CP_HIDDEN_UNITS = 128
-    STREAM_MC_HIDDEN_UNITS = dueling_hidden_layer3 
-    LR_MC = 0.00025
+    STREAM_MC_HIDDEN_UNITS = 64 
+    LR_MC = 0.00004
     ENV_INFO = {"CartPole-v0": [(4,), 2, LR_CP, STREAM_CP_HIDDEN_UNITS], 
                 "MountainCar-v0": [(2,), 3, LR_MC, STREAM_MC_HIDDEN_UNITS]}
 
     def __init__(self, environment_name):
         # Define your network architecture here. It is also a good idea to define any training operations 
         # and optimizers here, initialize your variables, or alternately compile your model here.  
-        state_dim, Q_dim, lr, dueling_hidden_layer3 = \
+        state_dim, Q_dim, lr, dueling_hidden_layer = \
                 self.ENV_INFO[environment_name]
         if environment_name == 'CartPole-v0':
             self.my_metric = my_metric_CP
@@ -203,11 +201,11 @@ class Dueling_QNetwork(QNetwork):
         ## streams from the output of the h1
         # First, the state-value stream: a fully-connected layer of 128 units
         ## which is then passed through to a scalar output layer
-        penult_dqn_out_vs = keras.layers.Dense(dueling_hidden_layer3, activation='relu')(penult_dqn_layer)
+        penult_dqn_out_vs = keras.layers.Dense(dueling_hidden_layer, activation='relu')(penult_dqn_layer)
         value_out = keras.layers.Dense(1, activation='relu')(penult_dqn_out_vs)
         # In parallel, next, the advantage-value stream: similarly a fc layer of 128 units
         ## then passed to another fc layer with output size = Q_dim
-        h2_out_advs = keras.layers.Dense(dueling_hidden_layer3, activation='relu')(penult_dqn_layer)
+        h2_out_advs = keras.layers.Dense(dueling_hidden_layer, activation='relu')(penult_dqn_layer)
         adv_out  = keras.layers.Dense(Q_dim, activation='relu')(h2_out_advs)
 
         # Lastly, the output of the Dueling network is defined as a function
@@ -216,16 +214,14 @@ class Dueling_QNetwork(QNetwork):
         ## where f(adv_out) = adv_out - sample_avg(adv)
         sample_avg_adv = keras.layers.Lambda(\
                 lambda l_in: keras.backend.mean(l_in, axis=1, keepdims=True))(adv_out)
-        repeat_sample_avg_adv = keras.layers.RepeatVector(Q_dim)(sample_avg_adv)
         f_adv = keras.layers.Subtract()([adv_out, sample_avg_adv])
-        repeat_v_out = keras.layers.RepeatVector(Q_dim)(value_out)
         Q_vals = keras.layers.Add()([value_out, f_adv])
 
         self.reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.5,
                           patience=10, min_lr=0.0000001, verbose=1)
         self.model = keras.models.Model(inputs=inputs, outputs=Q_vals)
         self.model.compile(metrics=[self.my_metric], loss='mse', 
-                optimizer=keras.optimizers.Adam(lr=lr))
+                optimizer=keras.optimizers.RMSprop(lr=lr))
 
     def fit(self, pred_values, true_values, **kwargs):
         # Fit the model we're training according to fit() API
@@ -305,7 +301,6 @@ class Deep_Agent():
                 initial_epsilon = self.DUEL_EPS_MC_INIT 
                 final_epsilon = self.DUEL_EPS_MC_FINAL 
                 exploration_decay_steps = self.DUEL_EPS_MC_DECAY_STEPS 
-                #self.skip_frames = True
 
             print("Dueling model")
 
@@ -492,7 +487,7 @@ class Deep_Agent():
         ## action is chosen action of eps greedy policy for dqn
         ## (next_state, reward, done, info) is output of env.step(action)
         action = None
-        if self.skip_frames and step_number % k_frames_between_actions == 0 \
+        if self.skip_frames and step_number % k_frames_between_actions != 0 \
                 and prev_action:
             action = prev_action   
         else:
@@ -689,8 +684,6 @@ class Deep_Agent():
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Deep Q Network Argument Parser')
     parser.add_argument('--env',dest='env',type=str, default='CartPole-v0')
-    parser.add_argument('--render',dest='render',type=int,default=0)
-    parser.add_argument('--train',dest='train',type=int,default=1)
     parser.add_argument('--model',dest='model_name',type=str, default="dqn")
     return parser.parse_args()
 
