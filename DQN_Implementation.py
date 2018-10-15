@@ -25,8 +25,8 @@ g_exploration_decay_steps = 10**5 # TODO
 num_episodes = 10000
 minibatch_size = 32 
 save_weights_num_episodes = 100
-steps_update_target_network_weights = 128 
-k_steps_before_minibatch = 32 
+steps_update_target_network_weights = 64 
+k_steps_before_minibatch = 16 
 k_frames_between_actions = 1 
 
 def my_metric_CP(y_true, y_pred): 
@@ -198,8 +198,7 @@ class Dueling_QNetwork(QNetwork):
             print("Using Dueling network architecture for", environment_name)
             h0_out = keras.layers.Dense(hidden_layer1, activation='relu')(inputs)
             h1_out = keras.layers.Dense(hidden_layer2, activation='relu')(h0_out)
-            h2_out = keras.layers.Dense(hidden_layer3, activation='relu')(h1_out)
-            penult_dqn_layer = h2_out
+            penult_dqn_layer = h1_out
         # We need to diverge the network architecture into 2 fully connected
         ## streams from the output of the h1
         # First, the state-value stream: a fully-connected layer of 128 units
@@ -220,7 +219,7 @@ class Dueling_QNetwork(QNetwork):
         repeat_sample_avg_adv = keras.layers.RepeatVector(Q_dim)(sample_avg_adv)
         f_adv = keras.layers.Subtract()([adv_out, sample_avg_adv])
         repeat_v_out = keras.layers.RepeatVector(Q_dim)(value_out)
-        Q_vals = keras.layers.Subtract()([value_out, f_adv])
+        Q_vals = keras.layers.Add()([value_out, f_adv])
 
         self.reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.5,
                           patience=10, min_lr=0.0000001, verbose=1)
@@ -259,7 +258,7 @@ class Deep_Agent():
     DUEL_EPS_CP_FINAL = 0.1
     DUEL_EPS_CP_DECAY_STEPS = 5*10**4
 
-    DUEL_EPS_MC_INIT = 0.3
+    DUEL_EPS_MC_INIT = 0.7
     DUEL_EPS_MC_FINAL = 0.05
     DUEL_EPS_MC_DECAY_STEPS = 1*10**6
     # In this class, we will implement functions to do the following. 
@@ -572,7 +571,7 @@ class Deep_Agent():
         plt.plot(self.avg_training_episodes_return,label='training_curve')
         plt.xlabel('Training Epochs (1 epoch corresponds to '+str(self.num_of_episodes_to_update_train_and_perf_curve) + ' episodes)')
         plt.ylabel('Average Reward per Episode')
-        plt.title("Training curve:", self.model_name, "-", self.env_name)
+        plt.title("Training curve: " + self.model_name + "-" + self.env_name)
         plt.legend(loc='best')
         plt.show()
 

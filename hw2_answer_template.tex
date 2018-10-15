@@ -475,34 +475,35 @@ In the weighted importance sampling, we see that the sample mean approaches a di
 \newpage
 \section*{Question 6 Programming Question}
     \begin{tcolorbox}[fit,height=22cm, width=\textwidth, blank, borderline={1pt}{-2pt},nobeforeafter]
-    {\large 6.1, 6.2, 6.3 (a)}
+    {\large 6.1, 6.2, 6.3 (a)}\\
+    *Dueling architecture's 2 streams were merged using equation (9) from [4].
 	\begin{table}[H]
 		\centering
 		\caption{Implementation settings}
 		\begin{tabular}{|c|p{7.785em}|l|l|r|}
 			\cline{2-5}    \multicolumn{1}{r|}{} & Settings & \multicolumn{1}{p{7.93em}|}{DQN} & \multicolumn{1}{p{7.93em}|}{DDQN} & \multicolumn{1}{p{7.5em}|}{Dueling} \\
 			\hline
-			\multirow{10}[20]{*}{\begin{sideways}CartPole-v0\end{sideways}} & NN MLP Architecture  & \multicolumn{1}{p{7.93em}|}{2 hidden layers each of size 32 with relu activation} & \multicolumn{1}{p{7.93em}|}{2 hidden layers each of size 60 with relu activation} &  \\
-			\cline{2-5}          & optimizer & \multicolumn{1}{p{7.93em}|}{Adam} & \multicolumn{1}{p{7.93em}|}{Adam} &  \\
-			\cline{2-5}          & Burn-in transitions & 10000 & 10000 &  \\
-			\cline{2-5}          & Initial epsilon & 0.5   & 1     &  \\
-			\cline{2-5}          & Final epsilon & 0.1   & 0.1   &  \\
-			\cline{2-5}          & Exploration decay steps & \multicolumn{1}{p{7.93em}|}{$2\times10^5$} & \multicolumn{1}{p{7.93em}|}{$2\times10^5$} &  \\
-			\cline{2-5}          & minibatch size & 32    & 32    &  \\
-			\cline{2-5}          & no. of steps until target network is updated & 100   & 100   &  \\
-			\cline{2-5}          & steps before minibatch & 4     & 1     &  \\
-			\cline{2-5}          & learning rate & 0.0001 & 0.0001 &  \\
+			\multirow{10}[20]{*}{\begin{sideways}CartPole-v0\end{sideways}} & NN MLP Architecture  & \multicolumn{1}{p{7.93em}|}{2 hidden layers each of size 32 with relu activation} & \multicolumn{1}{p{7.93em}|}{2 hidden layers each of size 60 with relu activation} & \multicolumn{1}{p{7.93em}|}{2 streams with 1 relu hidden layer of size 128 each connected to 1 shared hidden layer of size 64 with relu, merged as noted.} \\
+			\cline{2-5}          & optimizer & \multicolumn{1}{p{7.93em}|}{Adam} & \multicolumn{1}{p{7.93em}|}{Adam} & \multicolumn{1}{p{7.93em}|}{Adam} \\
+			\cline{2-5}          & Burn-in transitions & 10000 & 10000 &  10000 \\
+			\cline{2-5}          & Initial epsilon & 0.5   & 1     & 0.5 \\
+			\cline{2-5}          & Final epsilon & 0.1   & 0.1   & 0.1 \\
+			\cline{2-5}          & Exploration decay steps & \multicolumn{1}{p{7.93em}|}{$2\times10^5$} & \multicolumn{1}{p{7.93em}|}{$2\times10^5$} & \multicolumn{1}{p{7.93em}|}{$5\times10^4$} \\
+			\cline{2-5}          & minibatch size & 32    & 32    & 32  \\
+			\cline{2-5}          & no. of steps until target network is updated & 100   & 100   & 100  \\
+			\cline{2-5}          & steps before minibatch & 4     & 1     & 4 \\
+			\cline{2-5}          & learning rate & 0.0001 & 0.0001 &  0.0001 \\
 			\hline
-			\multirow{10}[20]{*}{\begin{sideways}MountainCar-v0\end{sideways}} & NN MLP Architecture  & \multicolumn{1}{p{7.93em}|}{3 hidden layers each of size 60 with relu activation} & \multicolumn{1}{p{7.93em}|}{3 hidden layers each of size 60 with relu activation} &  \\
-			\cline{2-5}          & optimizer & \multicolumn{1}{p{7.93em}|}{Adam} & \multicolumn{1}{p{7.93em}|}{Adam} &  \\
-			\cline{2-5}          & Burn-in transitions & 10000 & 10000 &  \\
-			\cline{2-5}          & Initial epsilon & 0.5   & 1     &  \\
-			\cline{2-5}          & Final epsilon & 0.1   & 0.1   &  \\
-			\cline{2-5}          & Exploration decay steps & \multicolumn{1}{p{7.93em}|}{$2\times10^5$} & \multicolumn{1}{p{7.93em}|}{$2\times10^5$} &  \\
-			\cline{2-5}          & minibatch size & 32    & 32    &  \\
-			\cline{2-5}          & no. of steps until target network is updated & 100   & 100   &  \\
-			\cline{2-5}          & steps before minibatch & 4     & 4     &  \\
-			\cline{2-5}          & learning rate & 0.0001 & 0.00007 &  \\
+			\multirow{10}[20]{*}{\begin{sideways}MountainCar-v0\end{sideways}} & NN MLP Architecture  & \multicolumn{1}{p{7.93em}|}{3 hidden layers each of size 60 with relu activation} & \multicolumn{1}{p{7.93em}|}{3 hidden layers each of size 60 with relu activation} & \multicolumn{1}{p{7.93em}|}{2 streams with 1 relu hidden layer of size 64, sharing 3 hidden relu layers of size 64 each, streams merged as above} \\
+			\cline{2-5}          & optimizer & \multicolumn{1}{p{7.93em}|}{Adam} & \multicolumn{1}{p{7.93em}|}{Adam} & \multicolumn{1}{p{7.93em}|}{Adam} \\
+			\cline{2-5}          & Burn-in transitions & 10000 & 10000 & 10000 \\
+			\cline{2-5}          & Initial epsilon & 0.5   & 1     & 0.7  \\
+			\cline{2-5}          & Final epsilon & 0.1   & 0.1   &  0.1 \\
+			\cline{2-5}          & Exploration decay steps & \multicolumn{1}{p{7.93em}|}{$2\times10^5$} & \multicolumn{1}{p{7.93em}|}{$2\times10^5$} & \multicolumn{1}{p{7.93em}|}{$2\times10^4$} \\
+			\cline{2-5}          & minibatch size & 32    & 32    & 32 \\
+			\cline{2-5}          & no. of steps until target network is updated & 100   & 100   & 20 \\
+			\cline{2-5}          & steps before minibatch & 4     & 4     & 16 \\
+			\cline{2-5}          & learning rate & 0.0001 & 0.00007 & 0.00007 \\
 			\hline
 		\end{tabular}%
 		\label{tab1}%
@@ -554,7 +555,7 @@ In the weighted importance sampling, we see that the sample mean approaches a di
     \includegraphics[width=.5\textwidth]{figures/CP_ddqn_performance_curve}
     The training curve for DDQN shows that our agent have learned to perform optimally in CartPole after about 15 epochs where it is stabilized there after. \\
     The performance curve shows that the agent have learnt to act optimally where the average reward achieved per episode after 20 epochs is the maximum achievable.\\
-    Compared to DQN, DDQN performes consistently better since it solves the Q-values overestimation problem of DQN.
+    Compared to DQN, DDQN performs consistently better since it solves the Q-values overestimation problem of DQN. Dueling converges quicker than DDQN for this environment, however, DDQN has more robust performance after convergence.
     \\
    	{\large Mountaincar-v0 DDQN training and performace plots:} \\
     \includegraphics[width=.5\textwidth]{figures/MC_ddqn_training_curve}
@@ -584,9 +585,13 @@ In the weighted importance sampling, we see that the sample mean approaches a di
     \begin{tcolorbox}[fit,height=22cm, width=\textwidth, blank, borderline={1pt}{-2pt},nobeforeafter]
     {\large 6.3  (b) and (c)} \\
     {\large CartPole-v0 Dueling training and performace plots:} \\
-    insert plots here\\
+    \includegraphics[width=.5\textwidth]{figures/CP_dueling_training_curve}
+    \includegraphics[width=.5\textwidth]{figures/CP_dueling_performance_curve} 
+    The training curve for the Dueling network shows sooner convergence on the CP task (around training epoch 10) than the other two Q Network models. We believe the drops in performance after epoch 20 and through epoch 40 could be avoided or subdued with a quicker decay of our epsilon value, as Dueling model converged much sooner than the epsilon decayed to its minimal value.  The performance curve for the Dueling network is not as stable as that of the DDQN network after ~25 training epochs, which may be due again to the differing epsilon decay rates and the fact that the DDQN model ran a minibatch update 4x's as often as the Dueling network. and could therefore have learned more robustly from its epsilon-greedy policy.\\
     {\large Mountaincar-v0 Dueling training and performace plots:} \\
-    insert plots here\\
+    \includegraphics[width=.5\textwidth]{figures/MC_dueling_training_curve}
+    \includegraphics[width=.5\textwidth]{figures/MC_dueling_performance_curve}\\ 
+    The MC environment was quite difficult for the Dueling network. Hyperparameters tuned included the width of the 2 network streams and the shared layers, epsilon decay rate, learning rate, and optimizer. Also, we experimented with a hyperparameter included in the Atari DQN paper (arXiv), which was the number of frames skipped/over which to repeat previous actions. Ultimately, the best performing instance of the model could stumble upon epsidoe returns above -200 (in the range of [-80, -190] after 10 training epochs, however, this were sporadic enough that the average epoch returns remained close to -200. According to the performance plot, the Dueling network never learned to reach the goal with the best hyperparameters we used. However, with more tuning, we believe that the Dueling network shows promise of converging quicker than DDQN and DQN since on multiple occasions the Dueling model reached the flag sooner than trainig epoch 10. We expected Dueling network 2-stream architecture to again outperform DQN and DDQN as it did in terms of quicker convergence for the CarPole environment.
     {\large 6.3 (d):} please refer to the submitted videos. \\
     {\large 6.3 (e):} The below table was generated using a \textbf{greedy} policy.
         \begin{table}[H]
@@ -596,9 +601,9 @@ In the weighted importance sampling, we see that the sample mean approaches a di
     		\hline
     		\textbf{\small Setting} & \multicolumn{1}{p{10.645em}|}{\textbf{ \small mean $\pm$ std.}} \\
     		\hline
-    		{\small CartPole Dueling} &  \\
+    		{\small CartPole Dueling} & \multicolumn{1}{l|}{\footnotesize 200.0 $\pm$ 0.0}  \\
     		\hline
-    		{\small MountainCar Dueling} &  \\
+    		{\small MountainCar Dueling} & \multicolumn{1}{l|}{\footnotesize -200.0 $\pm$ 0.0} \\
     		\hline
     	\end{tabular}%
     	\label{tab4}%
@@ -618,13 +623,13 @@ In the weighted importance sampling, we see that the sample mean approaches a di
     		\hline
     		{\small CartPole DDQN} & \multicolumn{1}{l|}{200.0 $\pm$ 0.0} \\
     		\hline
-    		{\small CartPole Dueling} &  \\
+    		{\small CartPole Dueling} & \multicolumn{1}{l|}{200.0 $\pm$ 0.0} \\
     		\hline
     		{\small MountainCar DQN} & \multicolumn{1}{l|}{-109.85 $\pm$ 11.6115} \\
     		\hline
     		{\small MountainCar DDQN} & \multicolumn{1}{l|}{-108.59 $\pm$ 9.8347} \\
     		\hline
-    		{\small MountainCar Dueling} &  \\
+    		{\small MountainCar Dueling} & \multicolumn{1}{l|}{-200 $\pm$ 0.0} \\
     		\hline
     	\end{tabular}%
     	\label{tab5}%
