@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 import math 
 
 #hyperparameters
-hidden_layer1 = 64 
-hidden_layer2 = 64
-hidden_layer3 = 64
-dueling_hidden_layer3 = 64 # TODO
+hidden_layer1 = 32 
+hidden_layer2 = 32 
+hidden_layer3 = 32 
+dueling_hidden_layer3 = 32 # TODO
 gamma_CP =  0.99
 gamma_MC =  1
 burn_in_MC = 10000
@@ -23,10 +23,10 @@ g_initial_epsilon = 0.5 # TODO
 g_final_epsilon = 0.1 # TODO
 g_exploration_decay_steps = 10**5 # TODO
 num_episodes = 10000
-minibatch_size = 32
+minibatch_size = 32 
 save_weights_num_episodes = 100
-steps_update_target_network_weights = 20
-k_steps_before_minibatch = 16 
+steps_update_target_network_weights = 128 
+k_steps_before_minibatch = 32 
 k_frames_between_actions = 1 
 
 def my_metric_CP(y_true, y_pred): 
@@ -174,7 +174,7 @@ class Dueling_QNetwork(QNetwork):
     LR_CP = 0.0001
     STREAM_CP_HIDDEN_UNITS = 128
     STREAM_MC_HIDDEN_UNITS = dueling_hidden_layer3 
-    LR_MC = 0.00007
+    LR_MC = 0.00025
     ENV_INFO = {"CartPole-v0": [(4,), 2, LR_CP, STREAM_CP_HIDDEN_UNITS], 
                 "MountainCar-v0": [(2,), 3, LR_MC, STREAM_MC_HIDDEN_UNITS]}
 
@@ -216,16 +216,21 @@ class Dueling_QNetwork(QNetwork):
         ## Q_vals = value_out - f(adv_out)  // Using broadcasting from TF
         ## where f(adv_out) = adv_out - sample_avg(adv)
         sample_avg_adv = keras.layers.Lambda(\
-                                lambda l_in: keras.backend.mean(l_in))(adv_out)
-        f_adv = keras.layers.Lambda(lambda l_in: l_in[0]-l_in[1])\
-                                    ([adv_out, sample_avg_adv])
-        Q_vals = keras.layers.Lambda(lambda l_in: l_in[0]-l_in[1])\
-                                    ([value_out, f_adv])
+                lambda l_in: keras.backend.mean(l_in, axis=1, keepdims=True))(adv_out)
+        repeat_sample_avg_adv = keras.layers.RepeatVector(Q_dim)(sample_avg_adv)
+        f_adv = keras.layers.Subtract()([adv_out, sample_avg_adv])
+        repeat_v_out = keras.layers.RepeatVector(Q_dim)(value_out)
+        Q_vals = keras.layers.Subtract()([value_out, f_adv])
+
         self.reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.5,
-                          patience=1, min_lr=0.0000001, verbose=1)
+                          patience=10, min_lr=0.0000001, verbose=1)
         self.model = keras.models.Model(inputs=inputs, outputs=Q_vals)
         self.model.compile(metrics=[self.my_metric], loss='mse', 
-                optimizer=keras.optimizers.RMSprop(lr=lr))
+                optimizer=keras.optimizers.Adam(lr=lr))
+
+    def fit(self, pred_values, true_values, **kwargs):
+        # Fit the model we're training according to fit() API
+        return self.model.fit(pred_values, true_values, **kwargs )
 
 class Replay_Memory():
 
@@ -254,9 +259,9 @@ class Deep_Agent():
     DUEL_EPS_CP_FINAL = 0.1
     DUEL_EPS_CP_DECAY_STEPS = 5*10**4
 
-    DUEL_EPS_MC_INIT = 0.7
-    DUEL_EPS_MC_FINAL = 0.1
-    DUEL_EPS_MC_DECAY_STEPS = 1*10**4
+    DUEL_EPS_MC_INIT = 0.3
+    DUEL_EPS_MC_FINAL = 0.05
+    DUEL_EPS_MC_DECAY_STEPS = 1*10**6
     # In this class, we will implement functions to do the following. 
     # (1) Create an instance of the Q Network class.
     # (2) Create a function that constructs a policy from the Q values predicted by the Q Network. 
@@ -301,7 +306,7 @@ class Deep_Agent():
                 initial_epsilon = self.DUEL_EPS_MC_INIT 
                 final_epsilon = self.DUEL_EPS_MC_FINAL 
                 exploration_decay_steps = self.DUEL_EPS_MC_DECAY_STEPS 
-                self.skip_frames = True
+                #self.skip_frames = True
 
             print("Dueling model")
 
@@ -495,7 +500,6 @@ class Deep_Agent():
             q_values = self.model.predict(state)[0]
             action =  self.epsilon_greedy_policy(q_values)
         next_state, reward, done, info = self.env.step(action)
-
         # Do a batch update after kth action taken
         update_tgt_flag = False
         update_tgt_flag = not self.is_DDQN and step_number % self.n_steps_before_update_tgt == 0
@@ -548,10 +552,10 @@ class Deep_Agent():
                 prev_action = action
                 if history:
                     #eps_metrics.append(history.history[self.model.my_metric.__name__])
-                    batch_lrs.append(history.history['lr'])
+                    #batch_lrs.append(history.history['lr'])
                     eps_metrics.append(history.history['loss'])
             eps_avg_metric = np.max(eps_metrics)    
-            eps_avg_lr = np.mean(batch_lrs)
+            eps_avg_lr = keras.backend.get_value(self.model.model.optimizer.lr) #np.mean(batch_lrs)
             episodes_return.append(returns)
             print("Episode: ", eps_counter," Reward: ", returns, "epsilon: ", self.epsilon, "LR: ", eps_avg_lr,\
                     "Avg loss:", eps_avg_metric )#self.model.on_epoch_end(1))
@@ -560,7 +564,7 @@ class Deep_Agent():
                 self.avg_training_episodes_return.append(sum(episodes_return)/self.num_of_episodes_to_update_train_and_perf_curve)
                 episodes_return = []
             if eps_counter % save_weights_num_episodes == 0:
-                filename = 'weights_'+str(self.env_name)+'_'+str(self.model_name)+'_'+str(eps_counter)
+                filename = 'laptop_weights_'+str(self.env_name)+'_'+str(self.model_name)+'_'+str(eps_counter)
                 print(filename)
                 self.model.save_model_weights(filename)
             eps_counter += 1
@@ -642,7 +646,7 @@ class Deep_Agent():
         step = 200
         num_episodes_for_performance_curve = 20
         for indx in range(start, stop,step):
-            filename = 'weights_'+str(self.env_name)+'_'+str(self.model_name)+'_'+str(indx)
+            filename = 'laptop_weights_'+str(self.env_name)+'_'+str(self.model_name)+'_'+str(indx)
             self.model.load_model_weights(filename)
             self.avg_performance_episodes_return.append(self.performance_plot_data(num_episodes_for_performance_curve))
 #            self.avg_performance_episodes_return_2SLA.append(self.performance_plot_data_2_steps_LA(num_episodes_for_performance_curve))
