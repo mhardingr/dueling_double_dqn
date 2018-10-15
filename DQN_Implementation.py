@@ -258,9 +258,9 @@ class Deep_Agent():
     DUEL_EPS_CP_FINAL = 0.1
     DUEL_EPS_CP_DECAY_STEPS = 5*10**4
 
-    DUEL_EPS_MC_INIT = 0.7
-    DUEL_EPS_MC_FINAL = 0.05
-    DUEL_EPS_MC_DECAY_STEPS = 1*10**6
+    DUEL_EPS_MC_INIT = 1.0
+    DUEL_EPS_MC_FINAL = 0.1
+    DUEL_EPS_MC_DECAY_STEPS = 2*10**5
     # In this class, we will implement functions to do the following. 
     # (1) Create an instance of the Q Network class.
     # (2) Create a function that constructs a policy from the Q values predicted by the Q Network. 
