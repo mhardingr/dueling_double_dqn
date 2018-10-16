@@ -476,7 +476,7 @@ In the weighted importance sampling, we see that the sample mean approaches a di
 \section*{Question 6 Programming Question}
     \begin{tcolorbox}[fit,height=22cm, width=\textwidth, blank, borderline={1pt}{-2pt},nobeforeafter]
     {\large 6.1, 6.2, 6.3 (a)}\\
-    {\large *Dueling architecture's 2 streams were merged using equation (9) from [4]. For MountainCar-v0 environment, the value and advantage stream shared the 3rd hidden layer of a DQN network in order to not thin out the backprop gradient over a fork in the network (*motivated by TA Nicholay Topkin).}
+    {\large *Dueling architecture's 2 streams were merged using equation (9) from [4]. For MountainCar-v0 environment, the value and advantage stream shared the 3rd hidden layer of a DQN network in order to not thin out the backprop gradient over a fork in the network (*motivated by TA Nicholay Topkin). As well, for both DQN and Dueling networks, a periodically heldout target model was used to compute the target values in the objective. DDQN learned using 2 DQN networks, updated symmetrically, as described in [3]. All networks were trained using mean-squared-error objective over minibatches.}
 	\begin{table}[H]
 		\centering
 		\caption{Implementation settings}
