@@ -10,9 +10,9 @@ import matplotlib.pyplot as plt
 import math 
 
 #hyperparameters
-hidden_layer1 = 120
-hidden_layer2 = 120 
-hidden_layer3 = 32 # not used in dueling
+hidden_layer1 = 64 
+hidden_layer2 = 64 
+hidden_layer3 = 64 # not used in dueling
 gamma_CP =  0.99
 gamma_MC =  1
 burn_in_MC = 10000
@@ -24,7 +24,7 @@ g_exploration_decay_steps = 10**5
 num_episodes = 10000
 minibatch_size = 32 
 save_weights_num_episodes = 100
-steps_update_target_network_weights = 32 
+steps_update_target_network_weights = 16 
 k_steps_before_minibatch = 4 
 # Motivated by experimental setup, para 3 of arXiv Atari DQN paper
 k_frames_between_actions = 2  
@@ -171,8 +171,8 @@ class Dueling_QNetwork(QNetwork):
     # list containing [state shape, n_actions, lr]
     LR_CP = 0.0001
     STREAM_CP_HIDDEN_UNITS = 128
-    STREAM_MC_HIDDEN_UNITS = 64 
-    LR_MC = 0.00004
+    STREAM_MC_HIDDEN_UNITS = 128 
+    LR_MC = 0.0004
     ENV_INFO = {"CartPole-v0": [(4,), 2, LR_CP, STREAM_CP_HIDDEN_UNITS], 
                 "MountainCar-v0": [(2,), 3, LR_MC, STREAM_MC_HIDDEN_UNITS]}
 
@@ -218,18 +218,22 @@ class Dueling_QNetwork(QNetwork):
 #        Q_vals = keras.layers.Add()([value_out, f_adv])
         h0_out = keras.layers.Input(shape=state_dim)
         h1_out = keras.layers.Dense(hidden_layer1, activation='relu')(h0_out)
-        h1_0ut = keras.layers.Dense(hidden_layer2, activation='relu')(h1_out)
-        layer = keras.layers.Dense(1 + Q_dim)(h1_0ut) # 1 + Q_dim (1 for value)
-        Q_vals = keras.layers.Lambda(lambda l_in: keras.backend.expand_dims(l_in[:, 0]) + l_in[:, 1:] - keras.backend.mean(l_in[:, 1:], keepdims=True), output_shape=(Q_dim,))(layer)
+        h2_out = keras.layers.Dense(hidden_layer2, activation='relu')(h1_out)
+        h3_out = keras.layers.Dense(hidden_layer3, activation='relu')(h2_out)
+        v_out = keras.layers.Dense(1)(h3_out)
+        adv_out = keras.layers.Dense(Q_dim,)(h3_out)
+        # Concatenate 2 streams
+        concat_out = keras.layers.Concatenate()([v_out, adv_out])
+        Q_vals = keras.layers.Lambda(lambda l_in: keras.backend.expand_dims(l_in[:, 0]) + l_in[:, 1:] - keras.backend.mean(l_in[:, 1:], keepdims=True), output_shape=(Q_dim,))(concat_out)
         self.reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.5,
                           patience=10, min_lr=0.0000001, verbose=1)
         self.model = keras.models.Model(inputs=h0_out, outputs=Q_vals)
         self.model.compile(metrics=[self.my_metric], loss='mse', 
-                optimizer=keras.optimizers.RMSprop(lr=lr))
+                optimizer=keras.optimizers.Adam(lr=lr))
 
     def fit(self, pred_values, true_values, **kwargs):
         # Fit the model we're training according to fit() API
-        return self.model.fit(pred_values, true_values, **kwargs )
+        return self.model.fit(pred_values, true_values,  **kwargs )
 
 class Replay_Memory():
 
@@ -258,9 +262,9 @@ class Deep_Agent():
     DUEL_EPS_CP_FINAL = 0.1
     DUEL_EPS_CP_DECAY_STEPS = 5*10**4
 
-    DUEL_EPS_MC_INIT = 1.0
+    DUEL_EPS_MC_INIT = .50
     DUEL_EPS_MC_FINAL = 0.1
-    DUEL_EPS_MC_DECAY_STEPS = 2*10**5
+    DUEL_EPS_MC_DECAY_STEPS = 2*10**6
     # In this class, we will implement functions to do the following. 
     # (1) Create an instance of the Q Network class.
     # (2) Create a function that constructs a policy from the Q values predicted by the Q Network. 
@@ -293,10 +297,13 @@ class Deep_Agent():
             self.model_name = model_name
             self.model = QNetwork(environment_name, is_double = self.is_DDQN)
             self.model_target = QNetwork(environment_name, is_double = self.is_DDQN)
+            # TODO Only for DQN, set model and target model weights equal
         else:
             self.model_name = "dueling"
             self.model = Dueling_QNetwork(environment_name)
             self.model_target = Dueling_QNetwork(environment_name)
+            # Make sure the target model and training model have same initial weights
+            self.model_target.set_weights(self.model.get_weights())
             if environment_name == "CartPole-v0":
                 initial_epsilon = self.DUEL_EPS_CP_INIT 
                 final_epsilon = self.DUEL_EPS_CP_FINAL 
@@ -307,7 +314,6 @@ class Deep_Agent():
                 exploration_decay_steps = self.DUEL_EPS_MC_DECAY_STEPS 
 
             print("Dueling model")
-
 
         self.burn_in = burn_in_MC if environment_name == 'MountainCar-v0' else burn_in_CP
         self.memory = Replay_Memory(self.burn_in)
