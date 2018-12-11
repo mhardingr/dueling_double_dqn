@@ -2,7 +2,7 @@
 
 Code was tested with Python version 2.7
 
-usage: DQN_Implementation.py [-h] [--env ENV] [--model MODEL_NAME]
+usage: all_dqns.py [-h] [--env ENV] [--model MODEL_NAME]
 
 Deep Q Network Argument Parser
 
