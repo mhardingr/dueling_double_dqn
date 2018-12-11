@@ -1,6 +1,0 @@
-1) Convergence when 1k episodes at 200, can reduce spiking by decaying epsilon slower
-2) Use RMSProp for gradient clipping, need to use different LR's (optimized for Adam optimizer)
-3) Environments can be solved with one constant network architecture
--- But faster and surer convergence if use different layer lengths for CP and MC)
--- CP can be shallow, MC can be solved with 3 layers all same number of hidden units (start with 32 or 64)
-4) 10 minutes to train on GPU - vectorize minibatch update first
