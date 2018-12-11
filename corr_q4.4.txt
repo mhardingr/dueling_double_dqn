@@ -1,0 +1,14 @@
+Initializing ...
+On to weighted importance sampling ...
+Q(x) = norm(3,1):
+For 10 samples, expected value and variance: 1.65367501515 2.46117695016
+For 1000 samples, expected value and variance: 0.634748212157 0.402113775799
+For 10k samples, expected value and variance: 0.815976502168 0.6656848398
+Q(x) = norm(0,1):
+For 10 samples, expected value and variance: 0.567880494037 0.273682757207
+For 1000 samples, expected value and variance: 0.750091065121 0.561515658469
+For 10k samples, expected value and variance: 0.779095279128 0.606868103301
+Q(x) = 15/16*x^2*(1+x)^2:
+For 10 samples, expected value and variance: 1.74877197264 2.47714476395
+For 1000 samples, expected value and variance: 0.92527904782 0.854429889844
+For 10k samples, expected value and variance: 0.896953235782 0.804364210204
